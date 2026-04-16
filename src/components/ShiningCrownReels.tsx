@@ -20,13 +20,14 @@ const VISIBLE_ROWS = 3;
 
 // ─── Animation ──────────────────────────────────────────────────────────────
 const SPIN_SPEED = 28;
-const REEL_STAGGER_MS = 80;
 
-// Speed presets: 1 = ~1 s total, 2 = ~0.5 s, 3 = ~0.2 s
+// Speed presets — mirrors the official example's progressive timing:
+//   reel[i] duration = stopBase + i * stopStep  (later reels take longer → stop later)
+//   total ≈ minSpin + stopBase + (REEL_COUNT-1) * stopStep
 const SPEED_PRESETS = {
-  1: { minSpin: 700,  stopDuration: 350 },
-  2: { minSpin: 200,  stopDuration: 200 },
-  3: { minSpin: 50,   stopDuration: 100 },
+  1: { minSpin: 300, stopBase: 220, stopStep: 110 }, // total ~1.1 s
+  2: { minSpin: 150, stopBase: 110, stopStep:  55 }, // total ~0.6 s
+  3: { minSpin:  50, stopBase:  55, stopStep:  25 }, // total ~0.2 s
 } as const;
 
 // ─── Colours ────────────────────────────────────────────────────────────────
@@ -225,7 +226,9 @@ export function ShiningCrownReels({ matrix, spinning, targetMatrix, onSpinComple
     const onTick = () => {
       const now = Date.now();
 
-      // Trigger stop
+      // Trigger stop — mirrors the official example:
+      //   all reels start their tween together, but reel[i] gets more distance
+      //   and more time so it finishes later → natural left-to-right cascade.
       const preset = SPEED_PRESETS[speedRef.current];
       if (spinRef.current && targetRef.current && !stopFiredRef.current && now - spinStartRef.current >= preset.minSpin) {
         stopFiredRef.current = true;
@@ -233,7 +236,11 @@ export function ShiningCrownReels({ matrix, spinning, targetMatrix, onSpinComple
 
         reels.forEach((reel, i) => {
           reel.stopping = true;
-          const targetPos = (Math.ceil(reel.position / REEL_SIZE) + 1) * REEL_SIZE;
+
+          // Extra cycles: reel 0 gets +2, reel 4 gets +6 — gives each reel
+          // enough distance for the backout deceleration to look smooth.
+          const extraCycles = 2 + i;
+          const targetPos = (Math.ceil(reel.position / REEL_SIZE) + extraCycles) * REEL_SIZE;
 
           paintSlot(reel.slots[1], mat[i]?.[0] ?? 0);
           paintSlot(reel.slots[2], mat[i]?.[1] ?? 0);
@@ -241,9 +248,9 @@ export function ShiningCrownReels({ matrix, spinning, targetMatrix, onSpinComple
 
           tweensRef.current.push({
             reel, from: reel.position, to: targetPos,
-            startMs: now + i * REEL_STAGGER_MS,
-            duration: preset.stopDuration,
-            ease: backout(0.5),
+            startMs: now, // all start together — duration difference creates the cascade
+            duration: preset.stopBase + i * preset.stopStep,
+            ease: backout(0.4),
             onDone: i === REEL_COUNT - 1 ? () => completeRef.current() : undefined,
           });
         });

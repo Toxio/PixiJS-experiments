@@ -102,7 +102,7 @@ export function ShiningCrownScene() {
 
   // Safety timeout — if API doesn't respond, fall back to a random local result.
   // Timeout matches the selected spin speed so the spin never runs longer than intended.
-  const safetyMs = spinSpeed === 1 ? 800 : spinSpeed === 2 ? 400 : 200;
+  const safetyMs = spinSpeed === 1 ? 350 : spinSpeed === 2 ? 180 : 80;
   useEffect(() => {
     if (!spinning) return;
     const t = setTimeout(() => {
