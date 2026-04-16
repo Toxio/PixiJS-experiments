@@ -1,0 +1,143 @@
+---
+description: Shining Crown Game Service API documentation for SignalR endpoints, request/response shapes, and frontend integration guide
+alwaysApply: true
+---
+
+# Shining Crown Game Service Documentation
+
+## Overview
+This documentation provides an overview of the **Shining Crown Game Service** and explains how frontend developers can interact with it to integrate the game logic into the client-side application.
+
+---
+
+## Game Overview
+The Shining Crown game allows users to:
+- Retrieve the initial game state
+- Perform spins
+
+The service is built using **SignalR** for real-time communication.
+
+---
+
+## Endpoints
+
+### 1. InitialState
+- **Route**: `https://slotgamesapi.yogames.win/slots`
+- **Method**: Real-time SignalR endpoint (Invoke Method: `InitialState`)
+- **Required Fields**:
+    - `GameName`: Name of the game.
+    - `IsDemo`: Flag to indicate if the game is in demo mode.
+    - `PartnerId`: Partner identifier for the request.
+
+### 2. GameAction
+- **Route**: `https://slotgamesapi.yogames.win/slots`
+- **Method**: Real-time SignalR endpoint (Invoke Method: `GameAction`)
+- **Required Fields**:
+    - `ActionType`: The type of action. Options: `Spin`.
+    - `SpinData`: Input data relevant to the action.
+
+---
+
+## Detailed Requests and Responses
+
+### InitialState
+
+**Request**:
+```json
+{
+   "GameName": "ShiningCrown",
+   "IsDemo": false,
+   "PartnerId": 12345
+}
+```
+
+**Response**:
+```json
+{
+   "ResponseCode": "SUCCESS",
+   "Balance": 500.00,
+   "Rate": 1.0,
+   "Precision": 2,
+   "MaxOdd": 5000,
+   "CurrencyCode": "USD",
+   "QuickBets": [1, 2, 5, 10],
+   "DefaultBetAmount": 2.00,
+   "Matrix": [[0, 0, 1], [1, 2, 2], [3, 4, 5]],
+   "OddsInfo": [[0.25, 0.75, 2.0], [0.4, 0.9, 4.0], [0.5, 1.0, 5.0]],
+   "SpinInfo": null,
+   "BonusSpinInfo": null,
+   "HasJackpot": false,
+   "HasBuyBonus": false
+}
+```
+
+### GameAction (Spin)
+
+**Request**:
+```json
+{
+   "ActionType": "Spin",
+   "Model": {
+      "Amount": 1.0
+   }
+}
+```
+
+**Response**:
+```json
+{
+   "SpinId": 1291,
+   "Balance": 979.0,
+   "MaxWin": false,
+   "WinAmount": 5.0,
+   "Odd": 5.0,
+   "OddMultiplier": 1.0,
+   "Result": {
+      "Matrix": [[8, 2, 3], [9, 6, 6], [8, 11, 2], [7, 7, 6], [8, 4, 4]],
+      "Additional": {
+         "Wins": [
+            {"Symbol": 2, "Line": 8, "Count": 3, "LineOdd": 4.0, "LineWinAmount": 4.0, "LineWinCoinAmount": 3.6},
+            {"Symbol": 8, "Line": 2, "Count": 3, "LineOdd": 1.0, "LineWinAmount": 1.0, "LineWinCoinAmount": 0.9}
+         ],
+         "ExpandingWild": [0, 9, 0, 0, 0]
+      }
+   },
+   "FreeSpinCount": 0,
+   "GambleInfo": 6,
+   "FreeBetInfo": null,
+   "BonusType": null,
+   "ResponseCode": 10
+}
+```
+
+---
+
+## Response Codes
+| Code                  | Description                         |
+|-----------------------|-------------------------------------|
+| `SUCCESS`             | The operation was successful.       |
+| `INVALID_GAMENAME`    | The provided game name is invalid.  |
+| `INVALID_OPERATION`   | The requested operation is invalid. |
+| `SPIN_NOT_FOUND`      | The spin result was not found.      |
+| `INVALID_SPINDATA`    | Invalid spin data.                  |
+
+---
+
+## Notes for Frontend Developers
+1. **Real-Time Communication**:
+    - Use **SignalR** to connect to the backend.
+    - Handle incoming events (`GameActionResult` and `InitialStateResult`) for updates.
+2. **Game Flow**:
+    - Call `InitialState` to retrieve the initial configuration.
+    - Call `GameAction` to perform spins and handle user actions.
+3. **UI Integration**:
+    - Use the `Matrix` field to display the game grid.
+    - Display `WinAmount` and `Balance` for user feedback.
+    - Support `QuickBets` for predefined betting options.
+
+---
+
+## Example Flow
+1. **Retrieve Initial State** — user opens the game, frontend calls `InitialState` and displays the configuration.
+2. **Perform Spin** — user selects a bet and clicks spin, frontend sends `GameAction` with `ActionType: Spin`.
+3. **Handle Result** — display the `Matrix` and `WinAmount`, update the balance.

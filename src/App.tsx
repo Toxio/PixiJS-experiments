@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Header, type TabId } from './components/Header';
 import { DemoScene } from './components/DemoScene';
+import { ShiningCrownScene } from './components/ShiningCrownScene';
 import { Placeholder } from './components/Placeholder';
 import './App.css';
 
@@ -12,7 +13,7 @@ function App() {
       <Header active={tab} onChange={setTab} />
       <main className="app-content">
         {tab === 'balls' && <DemoScene />}
-        {tab === 'shining-crown' && <Placeholder title="Shining Crown" badge="slot" />}
+        {tab === 'shining-crown' && <ShiningCrownScene />}
         {tab === 'plinko' && <Placeholder title="Plinko" badge="instant" />}
       </main>
     </div>

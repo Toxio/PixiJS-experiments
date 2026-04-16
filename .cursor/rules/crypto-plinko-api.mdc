@@ -1,0 +1,209 @@
+---
+description: Crypto-Plinko Game Service API documentation for WebSocket endpoints, request/response shapes, enums, and frontend integration guide
+alwaysApply: true
+---
+
+# Crypto-Plinko Game Service Documentation
+
+## Overview
+Real-time WebSocket (SignalR) API for the **Crypto-Plinko** game.
+
+- **Endpoint**: `https://cryptogamesapi.twgames.dev/cryptogames`
+- **Protocol**: WebSocket / SignalR
+
+---
+
+## Commands
+
+### 1. InitialState
+
+**Invoke**: `InitialState`
+
+**Request**:
+```json
+{
+  "GameName": "Crypto-Plinko",
+  "PartnerId": 1
+}
+```
+
+**Response message**: `InitialStateResult`
+```json
+{
+  "responseCode": 0,
+  "balance": 500.00,
+  "currencyRate": 1.0,
+  "currencyCode": "USD",
+  "currencyPrecision": 2,
+  "hash": "abc123...",
+  "limits": {
+    "minBet": 0.10,
+    "maxBet": 1000.00,
+    "maxWin": 5000.00,
+    "quickBets": [0.1, 0.5, 1, 5, 10],
+    "defaultBetAmount": 1.00
+  },
+  "oddsInfo": "Array of odds indexed by PlinkoRowType and RiskType"
+}
+```
+
+---
+
+### 2. Spin
+
+**Invoke**: `Spin`
+
+**Request**:
+```json
+{
+  "spinData": {
+    "ballCount": 1,
+    "riskType": 0,
+    "plinkoRowType": 0
+  },
+  "amount": 1.00
+}
+```
+> `spinData` fields are enum int values — see Enums section below.
+
+**Response message**: `SpinResult`
+```json
+{
+  "spinId": 9001,
+  "odd": 2.5,
+  "balance": 498.50,
+  "amount": 1.00,
+  "winAmount": 2.50,
+  "winCoinAmount": 2.25,
+  "newHash": "def456...",
+  "oldResultHashAndKey": { },
+  "result": {
+    "plinkoRowType": 0,
+    "riskType": 0,
+    "ballCount": 1,
+    "balls": [
+      { "odd": 2.5, "index": 4 }
+    ],
+    "paths": [[0, 1, 0, 1, 1, 0, 1, 0]]
+  },
+  "spinStatus": 1,
+  "responseCode": 0
+}
+```
+
+**`result` fields**:
+- `balls` — array of `BallModel { odd, index }` one per ball
+- `paths` — `List<List<int>>` describing the animation path for each ball (used to animate ball drop through pegs)
+
+---
+
+### 3. ChangeResult
+
+**Invoke**: `ChangeResult`
+
+**Request**:
+```json
+{
+  "ballCount": 1,
+  "riskType": 0,
+  "plinkoRowType": 0
+}
+```
+
+**Response message**: `ChangeResult`
+```json
+{
+  "Hash": "xyz789...",
+  "ResponseCode": 0
+}
+```
+
+---
+
+## Enums
+
+### BallCount
+| Name  | Value |
+|-------|-------|
+| `_1`  | 1     |
+| `_5`  | 5     |
+| `_10` | 10    |
+| `_25` | 25    |
+| `_50` | 50    |
+
+### PlinkoRowType
+| Name  | Value |
+|-------|-------|
+| `_8`  | 0     |
+| `_9`  | 1     |
+| `_10` | 2     |
+| `_11` | 3     |
+| `_12` | 4     |
+| `_13` | 5     |
+| `_14` | 6     |
+| `_15` | 7     |
+| `_16` | 8     |
+
+### RiskType
+| Name     | Value |
+|----------|-------|
+| `Low`    | 0     |
+| `Medium` | 1     |
+| `High`   | 2     |
+
+### SpinStatus
+| Name             | Value |
+|------------------|-------|
+| `Lose`           | 0     |
+| `Win`            | 1     |
+| `Pending`        | 2     |
+| `Canceled`       | 3     |
+| `Unknown`        | 4     |
+| `WaitingAction`  | 5     |
+
+### ValidationType (ResponseCode)
+| Value | Name                      | Description                          |
+|-------|---------------------------|--------------------------------------|
+| 0     | `Success`                 | Operation successful                 |
+| 1     | `GeneralError`            | General error                        |
+| 2     | `InvalidGame`             | Invalid game name                    |
+| 3     | `InvalidMinBet`           | Bet below minimum                    |
+| 4     | `InvalidMaxBet`           | Bet above maximum                    |
+| 5     | `InvalidMaxWin`           | Win exceeds max win limit            |
+| 6     | `InvalidSpin`             | Invalid spin                         |
+| 7     | `NotEnoughBalance`        | Insufficient balance                 |
+| 8     | `TransactionError`        | Transaction processing error         |
+| 9     | `UnAuthorizedUser`        | User not authorized                  |
+| 10    | `InvalidAmount`           | Invalid bet amount                   |
+| 11    | `InvalidSpinData`         | Invalid spin data payload            |
+| 12    | `InvalidToken`            | Invalid auth token                   |
+| 13    | `FreeBetError`            | Free bet error                       |
+| 14    | `BetsCountExceeded`       | Bets count exceeded                  |
+| 15    | `LimitsNotFound`          | Limits not found for currency        |
+| 16    | `PartnerGameConfigNotFound` | Partner game config not found      |
+| 17    | `PlayerLimitExceeded`     | Player limit exceeded                |
+| 18    | `SpinNotFound`            | Spin not found                       |
+| 19    | `InvalidSpinCount`        | Invalid spin count                   |
+| 20    | `InvalidSpinResult`       | Invalid spin result                  |
+| 21    | `InvalidDoActionData`     | Invalid do-action data               |
+
+---
+
+## Frontend Integration Notes
+
+1. **Game Flow**:
+   - Call `InitialState` on load to get balance, limits, and odds grid.
+   - Call `Spin` when user places a bet — pass `ballCount`, `riskType`, `plinkoRowType`, and `amount`.
+   - Use `ChangeResult` when the user changes board settings before spinning (updates provably fair hash).
+
+2. **Animation**:
+   - Use `result.paths` to animate each ball's drop through the peg grid.
+   - Each path is a list of `0` (left) / `1` (right) turns at each peg row.
+   - Use `result.balls[i].index` to determine which bucket the ball lands in.
+   - Use `result.balls[i].odd` to show the multiplier for that ball.
+
+3. **UI**:
+   - Render the peg grid based on `plinkoRowType` (8–16 rows).
+   - Show odds per bucket from `oddsInfo` (varies by `RiskType` and `PlinkoRowType`).
+   - Update `balance` and display `winAmount` after each spin.
+   - Support `limits.quickBets` for quick-select bet buttons.
