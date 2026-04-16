@@ -1,0 +1,39 @@
+export type TabId = 'balls' | 'shining-crown' | 'plinko';
+
+interface Tab {
+  id: TabId;
+  label: string;
+  badge: string;
+}
+
+const TABS: Tab[] = [
+  { id: 'balls', label: 'Balls', badge: 'demo' },
+  { id: 'shining-crown', label: 'Shining Crown', badge: 'slot' },
+  { id: 'plinko', label: 'Plinko', badge: 'instant' },
+];
+
+interface Props {
+  active: TabId;
+  onChange: (id: TabId) => void;
+}
+
+export function Header({ active, onChange }: Props) {
+  return (
+    <header className="app-header">
+      <nav className="tab-list" role="tablist">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={active === tab.id}
+            className={`tab-btn${active === tab.id ? ' tab-btn--active' : ''}`}
+            onClick={() => onChange(tab.id)}
+          >
+            {tab.label}
+            <span className={`tab-badge tab-badge--${tab.id}`}>{tab.badge}</span>
+          </button>
+        ))}
+      </nav>
+    </header>
+  );
+}
