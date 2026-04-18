@@ -1,0 +1,14 @@
+win-frame.png
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.5
+fx_4
+bounds:2,2,87,26
+rotate:90
+fx_frame
+bounds:2,91,163,163
+offsets:2,2,167,167
+sparcle_6
+bounds:167,199,57,55
+offsets:23,15,92,84

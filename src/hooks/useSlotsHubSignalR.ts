@@ -68,7 +68,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     const connection = createSlotsHubConnection();
 
     connection.on('InitialStateResult', (data: Record<string, unknown>) => {
-      console.log('InitialStateResult', data)
+      console.log('InitialStateResult', data);
       setBalance(Number(data.Balance ?? data.balance ?? 0));
       setCurrency(String(data.CurrencyCode ?? data.currencyCode ?? 'USD'));
       const mat = (data.Matrix ?? data.matrix) as number[][] | undefined;
@@ -81,7 +81,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     });
 
     connection.on('GameActionResult', (data: Record<string, unknown>) => {
-      console.log('GameActionResult', data)
+      console.log('GameActionResult', data);
       const result = (data.Result ?? data.result) as Record<string, unknown> | undefined;
       const mat = (result?.Matrix ?? result?.matrix) as number[][] | undefined;
       const additional = (result?.Additional ?? result?.additional) as
@@ -92,7 +92,8 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
         | undefined;
 
       setBalance(Number(data.Balance ?? data.balance ?? 0));
-      setWinAmount(Number(data.WinAmount ?? data.winAmount ?? 0));
+      const rawWin = Number(data.WinAmount ?? data.winAmount ?? 0);
+      setWinAmount(Number.isFinite(rawWin) ? rawWin : 0);
       setWinLines(
         (rawWins ?? []).map((w) => ({
           symbol: Number(w.Symbol ?? w.symbol),

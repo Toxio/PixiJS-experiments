@@ -1,4 +1,4 @@
-export type TabId = 'balls' | 'slots' | 'plinko';
+export type TabId = 'balls' | 'slots' | 'frame';
 
 interface Tab {
   id: TabId;
@@ -9,7 +9,7 @@ interface Tab {
 const TABS: Tab[] = [
   { id: 'balls', label: 'Balls', badge: 'demo' },
   { id: 'slots', label: 'Slots', badge: 'slot' },
-  { id: 'plinko', label: 'Plinko', badge: 'instant' },
+  { id: 'frame', label: 'Frame', badge: 'preview' },
 ];
 
 interface Props {

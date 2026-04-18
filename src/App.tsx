@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Header, type TabId } from './components/Header';
 import { DemoScene } from './components/DemoScene';
 import { SlotsScene } from './components/SlotsScene';
-import { Placeholder } from './components/Placeholder';
+import { WinFrameScene } from './components/WinFrameScene';
 import './App.css';
 
 function App() {
@@ -14,7 +14,7 @@ function App() {
       <main className="app-content">
         {tab === 'slots' && <SlotsScene />}
         {tab === 'balls' && <DemoScene />}
-        {tab === 'plinko' && <Placeholder title="Plinko" badge="instant" />}
+        {tab === 'frame' && <WinFrameScene />}
       </main>
     </div>
   );
