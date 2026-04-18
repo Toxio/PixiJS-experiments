@@ -9,6 +9,12 @@ import { useApplication } from '@pixi/react';
 import { useEffect, useRef } from 'react';
 import { BlurFilter, Container, Graphics, Text, TextStyle } from 'pixi.js';
 
+import {
+  createWinFrameSpine,
+  ensureWinFrameSpineLoaded,
+  layoutWinFrameInRect,
+} from '../animation/winFrameSpine';
+
 // ─── Layout ─────────────────────────────────────────────────────────────────
 const REEL_COUNT = 5;
 const REEL_SIZE = 8; // virtual loop length (must be > VISIBLE_ROWS + 1)
@@ -17,6 +23,15 @@ const SYMBOL_W = 124; // px per column
 const REEL_GAP = 18; // gap between reel background rectangles
 const REEL_PAD = 6; // how much the reel bg extends past the content
 const VISIBLE_ROWS = 3;
+
+/**
+ * `reel.slots[1..3]` map to top / middle / bottom of the visible window.
+ * Top-left of the middle cell is `y = SYMBOL_H` (not `2 * SYMBOL_H`, which is the bottom row).
+ */
+const CENTER_ROW_TOP_Y = SYMBOL_H;
+
+/** How long Spine win-frame overlays stay on center cells after reels stop. */
+const WIN_FRAME_FLASH_MS = 2000;
 
 // ─── Animation ──────────────────────────────────────────────────────────────
 const SPIN_SPEED = 28;
@@ -158,6 +173,8 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
   const spinStartRef = useRef(0);
   const stopFiredRef = useRef(false);
 
+  const clearWinFlashRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     if (!spinning) return;
     spinStartRef.current = Date.now();
@@ -166,6 +183,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
       r.stopping = false;
     });
     tweensRef.current = [];
+    clearWinFlashRef.current?.();
   }, [spinning]);
 
   // ── One-time scene setup ──────────────────────────────────────────────────
@@ -241,6 +259,59 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
     }
     reelsRef.current = reels;
 
+    reelCont.sortableChildren = true;
+
+    const winLineLayer = new Container();
+    winLineLayer.zIndex = 100;
+    winLineLayer.eventMode = 'none';
+
+    const winCells: Container[] = [];
+    for (let i = 0; i < REEL_COUNT; i++) {
+      const holder = new Container();
+      holder.x = i * (SYMBOL_W + REEL_GAP);
+      holder.y = CENTER_ROW_TOP_Y;
+      winLineLayer.addChild(holder);
+      winCells.push(holder);
+    }
+    reelCont.addChild(winLineLayer);
+
+    let winFlashTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function clearWinLineFlash() {
+      if (winFlashTimer !== null) {
+        clearTimeout(winFlashTimer);
+        winFlashTimer = null;
+      }
+      for (const h of winCells) {
+        const removed = h.removeChildren();
+        for (const d of removed) {
+          if (d.parent) {
+            d.parent.removeChild(d);
+          }
+          d.destroy();
+        }
+      }
+    }
+
+    async function flashWinLineFrames() {
+      clearWinLineFlash();
+      try {
+        await ensureWinFrameSpineLoaded();
+      } catch {
+        return;
+      }
+      for (let i = 0; i < REEL_COUNT; i++) {
+        const spine = createWinFrameSpine({ ticker: app.ticker });
+        layoutWinFrameInRect(spine, SYMBOL_W, SYMBOL_H, 1.05);
+        winCells[i].addChild(spine);
+      }
+      winFlashTimer = setTimeout(() => {
+        clearWinLineFlash();
+      }, WIN_FRAME_FLASH_MS);
+    }
+
+    clearWinFlashRef.current = clearWinLineFlash;
+
     // Initial matrix display
     reels.forEach((reel, i) => {
       paintSlot(reel.slots[1], matrix[i]?.[0] ?? 0);
@@ -293,7 +364,13 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
             startMs: now, // all start together — duration difference creates the cascade
             duration: preset.stopBase + i * preset.stopStep,
             ease: backout(0.4),
-            onDone: i === REEL_COUNT - 1 ? () => completeRef.current() : undefined,
+            onDone:
+              i === REEL_COUNT - 1
+                ? () => {
+                    void flashWinLineFrames();
+                    completeRef.current();
+                  }
+                : undefined,
           });
         });
       }
@@ -333,6 +410,8 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
     app.ticker.add(onTick);
 
     return () => {
+      clearWinFlashRef.current = null;
+      clearWinLineFlash();
       app.ticker.remove(onTick);
       tweensRef.current = [];
       reelsRef.current = [];

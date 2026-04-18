@@ -1,24 +1,12 @@
-import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Application, useApplication } from '@pixi/react';
+import type { Spine } from '@esotericsoftware/spine-pixi-v8';
 import { useEffect, useRef } from 'react';
-import { Assets } from 'pixi.js';
 
-import winFrameAtlasUrl from '../assets/winFrame/win-frame.atlas?url';
-import winFrameJsonUrl from '../assets/winFrame/win-frame.json?url';
-
-const FRAME_SPINE_SKEL_ALIAS = 'frameSpineJson';
-const FRAME_SPINE_ATLAS_ALIAS = 'frameSpineAtlas';
-
-const VIEWPORT_PAD = 0.99;
-
-let frameSpineAssetsRegistered = false;
-
-function registerFrameSpineAssets() {
-  if (frameSpineAssetsRegistered) return;
-  Assets.add({ alias: FRAME_SPINE_SKEL_ALIAS, src: winFrameJsonUrl });
-  Assets.add({ alias: FRAME_SPINE_ATLAS_ALIAS, src: winFrameAtlasUrl });
-  frameSpineAssetsRegistered = true;
-}
+import {
+  createWinFrameSpine,
+  ensureWinFrameSpineLoaded,
+  layoutWinFrameOnScreen,
+} from '../animation/winFrameSpine';
 
 function FrameSpineLayer() {
   const { app } = useApplication();
@@ -31,30 +19,15 @@ function FrameSpineLayer() {
       const spine = spineRef.current;
       if (!spine) return;
       spine.update(0);
-      const lb = spine.getLocalBounds();
-      const bw = lb.width > 0 ? lb.width : 1;
-      const bh = lb.height > 0 ? lb.height : 1;
-      const w = app.screen.width;
-      const h = app.screen.height;
-      const s = Math.min((w * VIEWPORT_PAD) / bw, (h * VIEWPORT_PAD) / bh);
-      spine.scale.set(s);
-      spine.position.set(w / 2 - (lb.x + lb.width / 2) * s, h / 2 - (lb.y + lb.height / 2) * s);
+      layoutWinFrameOnScreen(spine, app.screen.width, app.screen.height, 0.99);
     };
 
     void (async () => {
       try {
-        registerFrameSpineAssets();
-        await Assets.load([FRAME_SPINE_SKEL_ALIAS, FRAME_SPINE_ATLAS_ALIAS]);
+        await ensureWinFrameSpineLoaded();
         if (cancelled) return;
 
-        const spine = Spine.from({
-          skeleton: FRAME_SPINE_SKEL_ALIAS,
-          atlas: FRAME_SPINE_ATLAS_ALIAS,
-          boundsProvider: new SetupPoseBoundsProvider(),
-        });
-
-        spine.state.setAnimation(0, 'Action', true);
-
+        const spine = createWinFrameSpine({ ticker: app.ticker });
         if (cancelled) {
           spine.destroy();
           return;
@@ -72,8 +45,14 @@ function FrameSpineLayer() {
     return () => {
       cancelled = true;
       app.renderer.off('resize', layout);
-      spineRef.current?.destroy();
+      const s = spineRef.current;
       spineRef.current = null;
+      if (s) {
+        if (s.parent) {
+          s.parent.removeChild(s);
+        }
+        s.destroy();
+      }
     };
   }, [app]);
 
