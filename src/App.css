@@ -115,6 +115,11 @@ body,
   color: #c9a6ff;
 }
 
+.tab-badge--glove {
+  background: rgba(116, 225, 255, 0.2);
+  color: #8fe7ff;
+}
+
 /* ── Canvas scene ── */
 .canvas-wrapper {
   position: relative;
@@ -126,6 +131,54 @@ body,
   display: block;
   width: 100% !important;
   height: 100% !important;
+}
+
+.glove-ui {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.glove-animation-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(143, 231, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(5, 10, 24, 0.72);
+  backdrop-filter: blur(10px);
+  pointer-events: all;
+}
+
+.glove-animation-btn {
+  min-width: 88px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.glove-animation-btn:hover {
+  color: #ffffff;
+}
+
+.glove-animation-btn--active {
+  background: rgba(143, 231, 255, 0.16);
+  color: #8fe7ff;
+  box-shadow: 0 0 18px rgba(143, 231, 255, 0.18);
 }
 
 /* ── Overlay (balls scene) ── */

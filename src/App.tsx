@@ -4,6 +4,7 @@ import { DemoScene } from './components/DemoScene';
 import { SlotsScene } from './components/SlotsScene';
 import { BlastScene } from './components/BlastScene';
 import { ExplosionScene } from './components/ExplosionScene';
+import { GloveScene } from './components/GloveScene';
 import { WinFrameScene } from './components/WinFrameScene';
 import './App.css';
 
@@ -19,6 +20,7 @@ function App() {
         {tab === 'frame' && <WinFrameScene />}
         {tab === 'explosion' && <ExplosionScene />}
         {tab === 'blast' && <BlastScene />}
+        {tab === 'glove' && <GloveScene />}
       </main>
     </div>
   );
