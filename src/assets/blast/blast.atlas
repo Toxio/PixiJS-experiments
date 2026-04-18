@@ -1,0 +1,12 @@
+blast.png
+size:373,373
+filter:Linear,Linear
+pma:true
+Glow_2
+bounds:2,2,129,121
+offsets:14,13,159,146
+blast
+bounds:2,125,250,246
+star
+bounds:254,271,74,100
+offsets:16,13,110,134

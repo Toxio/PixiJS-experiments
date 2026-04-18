@@ -105,6 +105,16 @@ body,
   color: #00fa9a;
 }
 
+.tab-badge--explosion {
+  background: rgba(255, 99, 71, 0.18);
+  color: #ff6347;
+}
+
+.tab-badge--blast {
+  background: rgba(186, 140, 255, 0.2);
+  color: #c9a6ff;
+}
+
 /* ── Canvas scene ── */
 .canvas-wrapper {
   position: relative;

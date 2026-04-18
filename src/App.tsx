@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Header, type TabId } from './components/Header';
 import { DemoScene } from './components/DemoScene';
 import { SlotsScene } from './components/SlotsScene';
+import { BlastScene } from './components/BlastScene';
+import { ExplosionScene } from './components/ExplosionScene';
 import { WinFrameScene } from './components/WinFrameScene';
 import './App.css';
 
@@ -15,6 +17,8 @@ function App() {
         {tab === 'slots' && <SlotsScene />}
         {tab === 'balls' && <DemoScene />}
         {tab === 'frame' && <WinFrameScene />}
+        {tab === 'explosion' && <ExplosionScene />}
+        {tab === 'blast' && <BlastScene />}
       </main>
     </div>
   );
