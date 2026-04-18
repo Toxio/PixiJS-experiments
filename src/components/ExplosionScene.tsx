@@ -4,8 +4,8 @@ import { useEffect, useRef } from 'react';
 
 import {
   createExplosionSpine,
-  ensureExplosionSpineLoaded,
   layoutExplosionOnScreen,
+  reloadExplosionSpineAssetsForPreview,
 } from '../animation/explosionSpine';
 
 function ExplosionSpineLayer() {
@@ -18,13 +18,16 @@ function ExplosionSpineLayer() {
     const layout = () => {
       const spine = spineRef.current;
       if (!spine) return;
+      const w = app.screen.width;
+      const h = app.screen.height;
+      if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
       spine.update(0);
-      layoutExplosionOnScreen(spine, app.screen.width, app.screen.height, 1, 'cover');
+      layoutExplosionOnScreen(spine, w, h, 0.99, 'contain');
     };
 
     void (async () => {
       try {
-        await ensureExplosionSpineLoaded();
+        await reloadExplosionSpineAssetsForPreview();
         if (cancelled) return;
 
         const spine = createExplosionSpine({ ticker: app.ticker, loop: true });
@@ -37,6 +40,9 @@ function ExplosionSpineLayer() {
         app.stage.addChild(spine);
         layout();
         app.renderer.on('resize', layout);
+        requestAnimationFrame(() => {
+          if (!cancelled) layout();
+        });
       } catch (e) {
         console.warn('Explosion Spine failed to load', e);
       }
@@ -59,25 +65,13 @@ function ExplosionSpineLayer() {
   return null;
 }
 
-function explosionViewportResolution() {
-  if (typeof window === 'undefined') return 1;
-  return Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
 export function ExplosionScene() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="frame-preview-scene">
-      <div className="frame-preview-viewport" ref={containerRef}>
-        <Application
-          background={0x0a0a12}
-          resizeTo={containerRef}
-          antialias
-          autoDensity
-          resolution={explosionViewportResolution()}
-          preferWebGLVersion={2}
-        >
+      <div ref={containerRef} className="canvas-wrapper">
+        <Application background={0x0a0a12} resizeTo={containerRef} antialias>
           <ExplosionSpineLayer />
         </Application>
       </div>

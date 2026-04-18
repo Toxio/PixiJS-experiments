@@ -37,9 +37,11 @@ export type CreateWinFrameSpineOptions = {
    * `Ticker.shared` and mesh data is not updated before render → BatchableSpineSlot crash.
    */
   ticker?: Ticker;
+  /** Default true. Set false for a single full `Action` cycle. */
+  loop?: boolean;
 };
 
-/** New instance with `Action` animation (loop). Call after `ensureWinFrameSpineLoaded`. */
+/** New instance with `Action` animation. Call after `ensureWinFrameSpineLoaded`. */
 export function createWinFrameSpine(options?: CreateWinFrameSpineOptions): Spine {
   const spine = Spine.from({
     skeleton: WIN_FRAME_SKEL_ALIAS,
@@ -47,9 +49,16 @@ export function createWinFrameSpine(options?: CreateWinFrameSpineOptions): Spine
     boundsProvider: new SetupPoseBoundsProvider(),
     ticker: options?.ticker,
   });
-  spine.state.setAnimation(0, 'Action', true);
+  spine.state.setAnimation(0, 'Action', options?.loop ?? true);
   spine.update(0);
   return spine;
+}
+
+/** Length of one full animation cycle in ms (Spine data duration, seconds → ms). */
+export function getSpineAnimationDurationMs(spine: Spine, animationName: string): number {
+  const anim = spine.skeleton.data.findAnimation(animationName);
+  const sec = anim?.duration ?? 1;
+  return Math.max(1, Math.round(sec * 1000));
 }
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Spine «Hit multiplier» — анімація вибуху / множника.
+ * Spine "Hit multiplier" — explosion / multiplier VFX.
  */
 import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Assets, type Ticker } from 'pixi.js';
@@ -29,9 +29,29 @@ export function ensureExplosionSpineLoaded(): Promise<void> {
   return loadPromise;
 }
 
+/**
+ * After slot reels destroy Spine instances, GPU-backed atlas data can be invalid while
+ * `Assets` still reports a resolved load — the Explosion preview tab then shows an empty stage.
+ * Unload + reload aliases so a fresh `Spine.from` works on a new Application.
+ */
+export async function reloadExplosionSpineAssetsForPreview(): Promise<void> {
+  registered = false;
+  loadPromise = null;
+  for (const alias of [EXPLOSION_SKEL_ALIAS, EXPLOSION_ATLAS_ALIAS]) {
+    try {
+      await Assets.unload(alias);
+    } catch {
+      /* alias not registered yet */
+    }
+  }
+  registerExplosionSpineAssets();
+  loadPromise = Assets.load([EXPLOSION_SKEL_ALIAS, EXPLOSION_ATLAS_ALIAS]).then(() => undefined);
+  await loadPromise;
+}
+
 export type CreateExplosionSpineOptions = {
   ticker?: Ticker;
-  /** Якщо false — один прохід `Action` без циклу */
+  /** If false, plays a single `Action` pass (one full cycle). */
   loop?: boolean;
 };
 
@@ -47,7 +67,7 @@ export function createExplosionSpine(options?: CreateExplosionSpineOptions): Spi
   return spine;
 }
 
-/** `contain` — вміщається в екран; `cover` — максимальний масштаб, заповнює в’юпорт (можливе обрізання). */
+/** `contain`: fit inside; `cover`: scale up to fill (may crop). */
 export type ExplosionLayoutFit = 'contain' | 'cover';
 
 export function layoutExplosionOnScreen(
@@ -71,5 +91,27 @@ export function layoutExplosionOnScreen(
   spine.position.set(
     screenW / 2 - (lb.x + lb.width / 2) * s,
     screenH / 2 - (lb.y + lb.height / 2) * s,
+  );
+}
+
+/** Fit into one symbol cell on the reel grid. */
+export function layoutExplosionInRect(
+  spine: Spine,
+  width: number,
+  height: number,
+  pad = 1.05,
+): void {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return;
+  }
+  spine.update(0);
+  const lb = spine.getLocalBounds();
+  const bw = lb.width > 0 ? lb.width : 1;
+  const bh = lb.height > 0 ? lb.height : 1;
+  const s = Math.min((width * pad) / bw, (height * pad) / bh);
+  spine.scale.set(s);
+  spine.position.set(
+    width / 2 - (lb.x + lb.width / 2) * s,
+    height / 2 - (lb.y + lb.height / 2) * s,
   );
 }

@@ -5,13 +5,25 @@
  * border (classic EGT-style slot look).
  */
 
+import type { Spine } from '@esotericsoftware/spine-pixi-v8';
 import { useApplication } from '@pixi/react';
 import { useEffect, useRef } from 'react';
 import { BlurFilter, Container, Graphics, Text, TextStyle } from 'pixi.js';
 
 import {
+  createBlastSpine,
+  ensureBlastSpineLoaded,
+  layoutBlastInRect,
+} from '../animation/blastSpine';
+import {
+  createExplosionSpine,
+  ensureExplosionSpineLoaded,
+  layoutExplosionInRect,
+} from '../animation/explosionSpine';
+import {
   createWinFrameSpine,
   ensureWinFrameSpineLoaded,
+  getSpineAnimationDurationMs,
   layoutWinFrameInRect,
 } from '../animation/winFrameSpine';
 
@@ -30,8 +42,7 @@ const VISIBLE_ROWS = 3;
  */
 const CENTER_ROW_TOP_Y = SYMBOL_H;
 
-/** How long Spine win-frame overlays stay on center cells after reels stop. */
-const WIN_FRAME_FLASH_MS = 2000;
+// Post-stop overlay visibility uses one full Spine `Action` duration (see `getSpineAnimationDurationMs`).
 
 // ─── Animation ──────────────────────────────────────────────────────────────
 const SPIN_SPEED = 28;
@@ -66,10 +77,27 @@ const SYMS: Record<number, string> = {
 };
 const SYM_COUNT = Object.keys(SYMS).length;
 
+/** Symbol ids — Blast while spinning vs Explosion after reels stop (final grid). */
+const SYM_LEMON = 1;
+const SYM_BELL = 5;
+const SYM_STAR = 6;
+const SYM_CROWN = 9;
+const SYM_STAR_BURST = 11;
+
+function symUsesBlastWhileSpinning(id: number): boolean {
+  return id === SYM_LEMON || id === SYM_STAR || id === SYM_STAR_BURST;
+}
+
+function symUsesExplosionAfterStop(id: number): boolean {
+  return id === SYM_CROWN || id === SYM_BELL;
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Slot {
   container: Container;
   label: Text;
+  symId: number;
+  blastFx?: Spine;
 }
 
 interface Reel {
@@ -102,7 +130,13 @@ function randomSymId() {
   return Math.floor(Math.random() * SYM_COUNT);
 }
 
+/** Whether the symbol cell intersects the three visible rows of the reel window. */
+function isSlotInVisibleStrip(containerY: number): boolean {
+  return containerY > -SYMBOL_H * 0.5 && containerY < VISIBLE_ROWS * SYMBOL_H;
+}
+
 function paintSlot(slot: Slot, id: number) {
+  slot.symId = id;
   const sym = SYMS[id] ?? '?';
   slot.label.text = sym;
   if (sym === '7') {
@@ -174,6 +208,9 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
   const stopFiredRef = useRef(false);
 
   const clearWinFlashRef = useRef<(() => void) | null>(null);
+  const clearLemonBlastsRef = useRef<(() => void) | null>(null);
+  const clearCrownFlashRef = useRef<(() => void) | null>(null);
+  const spineFxReadyRef = useRef(false);
 
   useEffect(() => {
     if (!spinning) return;
@@ -184,10 +221,17 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
     });
     tweensRef.current = [];
     clearWinFlashRef.current?.();
+    clearLemonBlastsRef.current?.();
+    clearCrownFlashRef.current?.();
   }, [spinning]);
 
   // ── One-time scene setup ──────────────────────────────────────────────────
   useEffect(() => {
+    spineFxReadyRef.current = false;
+    void Promise.all([ensureBlastSpineLoaded(), ensureExplosionSpineLoaded()]).then(() => {
+      spineFxReadyRef.current = true;
+    });
+
     const { width, height } = app.screen;
     const totalW = REEL_COUNT * SYMBOL_W + (REEL_COUNT - 1) * REEL_GAP;
     const visH = VISIBLE_ROWS * SYMBOL_H;
@@ -246,11 +290,13 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
         label.anchor.set(0.5);
         label.x = SYMBOL_W / 2;
         label.y = SYMBOL_H / 2;
+        label.zIndex = 0;
+        container.sortableChildren = true;
         container.addChild(label);
         container.y = j * SYMBOL_H;
         rc.addChild(container);
 
-        const slot: Slot = { container, label };
+        const slot: Slot = { container, label, symId: 0 };
         paintSlot(slot, randomSymId());
         slots.push(slot);
       }
@@ -300,17 +346,112 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
       } catch {
         return;
       }
+      let flashMs = 1000;
       for (let i = 0; i < REEL_COUNT; i++) {
-        const spine = createWinFrameSpine({ ticker: app.ticker });
+        const spine = createWinFrameSpine({ ticker: app.ticker, loop: false });
+        if (i === 0) flashMs = getSpineAnimationDurationMs(spine, 'Action');
         layoutWinFrameInRect(spine, SYMBOL_W, SYMBOL_H, 1.05);
         winCells[i].addChild(spine);
       }
       winFlashTimer = setTimeout(() => {
         clearWinLineFlash();
-      }, WIN_FRAME_FLASH_MS);
+      }, flashMs);
     }
 
     clearWinFlashRef.current = clearWinLineFlash;
+
+    const crownExplosionLayer = new Container();
+    crownExplosionLayer.zIndex = 102;
+    crownExplosionLayer.eventMode = 'none';
+    reelCont.addChild(crownExplosionLayer);
+
+    let crownFlashTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function clearCrownExplosionFlash() {
+      if (crownFlashTimer !== null) {
+        clearTimeout(crownFlashTimer);
+        crownFlashTimer = null;
+      }
+      for (const c of crownExplosionLayer.removeChildren()) {
+        c.destroy({ children: true });
+      }
+    }
+
+    function clearAllLemonBlasts() {
+      for (const reel of reels) {
+        for (const slot of reel.slots) {
+          if (slot.blastFx) {
+            const b = slot.blastFx;
+            slot.blastFx = undefined;
+            if (b.parent) b.parent.removeChild(b);
+            b.destroy();
+          }
+          slot.label.visible = true;
+        }
+      }
+    }
+    clearLemonBlastsRef.current = clearAllLemonBlasts;
+    clearCrownFlashRef.current = clearCrownExplosionFlash;
+
+    /** Blast loops while lemon / star symbols are visible during an active spin. */
+    function syncBlastFxForSlot(slot: Slot) {
+      const wantBlast =
+        spineFxReadyRef.current &&
+        spinRef.current &&
+        symUsesBlastWhileSpinning(slot.symId) &&
+        isSlotInVisibleStrip(slot.container.y);
+
+      if (!wantBlast) {
+        if (slot.blastFx) {
+          const b = slot.blastFx;
+          slot.blastFx = undefined;
+          if (b.parent) b.parent.removeChild(b);
+          b.destroy();
+        }
+        slot.label.visible = true;
+        return;
+      }
+
+      if (!slot.blastFx) {
+        const spine = createBlastSpine({ ticker: app.ticker, loop: true, animation: 'Action' });
+        slot.blastFx = spine;
+        spine.zIndex = 2;
+        slot.container.addChild(spine);
+      }
+      slot.label.visible = false;
+      layoutBlastInRect(slot.blastFx!, SYMBOL_W, SYMBOL_H, 1.05);
+    }
+
+    async function flashPostStopExplosions(mat: number[][]) {
+      clearCrownExplosionFlash();
+      try {
+        await ensureExplosionSpineLoaded();
+      } catch {
+        return;
+      }
+      let flashMs = 1000;
+      let anyTarget = false;
+      let firstExplosion = true;
+      for (let i = 0; i < REEL_COUNT; i++) {
+        for (let r = 0; r < VISIBLE_ROWS; r++) {
+          if (!symUsesExplosionAfterStop(mat[i]?.[r] ?? -1)) continue;
+          anyTarget = true;
+          const holder = new Container();
+          holder.x = i * (SYMBOL_W + REEL_GAP);
+          holder.y = r * SYMBOL_H;
+          crownExplosionLayer.addChild(holder);
+          const spine = createExplosionSpine({ ticker: app.ticker, loop: false });
+          if (firstExplosion) {
+            flashMs = getSpineAnimationDurationMs(spine, 'Action');
+            firstExplosion = false;
+          }
+          layoutExplosionInRect(spine, SYMBOL_W, SYMBOL_H, 1.05);
+          holder.addChild(spine);
+        }
+      }
+      if (!anyTarget) return;
+      crownFlashTimer = setTimeout(() => clearCrownExplosionFlash(), flashMs);
+    }
 
     // Initial matrix display
     reels.forEach((reel, i) => {
@@ -368,6 +509,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
               i === REEL_COUNT - 1
                 ? () => {
                     void flashWinLineFrames();
+                    void flashPostStopExplosions(mat);
                     completeRef.current();
                   }
                 : undefined,
@@ -403,6 +545,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
           if (s.container.y < 0 && prevY > SYMBOL_H && !reel.stopping) {
             paintSlot(s, randomSymId());
           }
+          syncBlastFxForSlot(s);
         }
       }
     };
@@ -410,8 +553,13 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
     app.ticker.add(onTick);
 
     return () => {
+      spineFxReadyRef.current = false;
       clearWinFlashRef.current = null;
+      clearLemonBlastsRef.current = null;
+      clearCrownFlashRef.current = null;
       clearWinLineFlash();
+      clearCrownExplosionFlash();
+      clearAllLemonBlasts();
       app.ticker.remove(onTick);
       tweensRef.current = [];
       reelsRef.current = [];

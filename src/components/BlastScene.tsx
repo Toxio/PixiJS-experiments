@@ -4,8 +4,8 @@ import { useEffect, useRef } from 'react';
 
 import {
   createBlastSpine,
-  ensureBlastSpineLoaded,
   layoutBlastOnScreen,
+  reloadBlastSpineAssetsForPreview,
 } from '../animation/blastSpine';
 
 function BlastSpineLayer() {
@@ -18,13 +18,16 @@ function BlastSpineLayer() {
     const layout = () => {
       const spine = spineRef.current;
       if (!spine) return;
+      const w = app.screen.width;
+      const h = app.screen.height;
+      if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
       spine.update(0);
-      layoutBlastOnScreen(spine, app.screen.width, app.screen.height, 1, 'cover');
+      layoutBlastOnScreen(spine, w, h, 0.99, 'contain');
     };
 
     void (async () => {
       try {
-        await ensureBlastSpineLoaded();
+        await reloadBlastSpineAssetsForPreview();
         if (cancelled) return;
 
         const spine = createBlastSpine({ ticker: app.ticker, loop: true, animation: 'Action' });
@@ -37,6 +40,9 @@ function BlastSpineLayer() {
         app.stage.addChild(spine);
         layout();
         app.renderer.on('resize', layout);
+        requestAnimationFrame(() => {
+          if (!cancelled) layout();
+        });
       } catch (e) {
         console.warn('Blast Spine failed to load', e);
       }
@@ -59,25 +65,13 @@ function BlastSpineLayer() {
   return null;
 }
 
-function blastViewportResolution() {
-  if (typeof window === 'undefined') return 1;
-  return Math.min(window.devicePixelRatio || 1, 2.5);
-}
-
 export function BlastScene() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="frame-preview-scene">
-      <div className="frame-preview-viewport" ref={containerRef}>
-        <Application
-          background={0x0a0a12}
-          resizeTo={containerRef}
-          antialias
-          autoDensity
-          resolution={blastViewportResolution()}
-          preferWebGLVersion={2}
-        >
+      <div ref={containerRef} className="canvas-wrapper">
+        <Application background={0x0a0a12} resizeTo={containerRef} antialias>
           <BlastSpineLayer />
         </Application>
       </div>
