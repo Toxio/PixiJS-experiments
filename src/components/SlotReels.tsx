@@ -25,7 +25,12 @@ import {
   ensureWinFrameSpineLoaded,
   getSpineAnimationDurationMs,
   layoutWinFrameInRect,
-} from '../animation/winFrameSpine';
+} from '../animation/winFrameSpine.ts';
+import {
+  createGloveSpine,
+  ensureGloveSpineLoaded,
+  layoutGloveInRect,
+} from '../animation/gloveSpine';
 
 // ─── Layout ─────────────────────────────────────────────────────────────────
 const REEL_COUNT = 5;
@@ -62,7 +67,7 @@ const REEL_BG_COLOR = 0x091460; // each reel column fill
 
 // ─── Symbols ────────────────────────────────────────────────────────────────
 const SYMS: Record<number, string> = {
-  0: '🍒',
+  0: '',
   1: '🍋',
   2: '🍊',
   3: '🍇',
@@ -83,6 +88,7 @@ const SYM_BELL = 5;
 const SYM_STAR = 6;
 const SYM_CROWN = 9;
 const SYM_STAR_BURST = 11;
+const SYM_GLOVE = 0;
 
 function symUsesBlastWhileSpinning(id: number): boolean {
   return id === SYM_LEMON || id === SYM_STAR || id === SYM_STAR_BURST;
@@ -98,6 +104,8 @@ interface Slot {
   label: Text;
   symId: number;
   blastFx?: Spine;
+  gloveFx?: Spine;
+  gloveAnim?: 'Idle' | 'Action';
 }
 
 interface Reel {
@@ -211,6 +219,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
   const clearLemonBlastsRef = useRef<(() => void) | null>(null);
   const clearCrownFlashRef = useRef<(() => void) | null>(null);
   const spineFxReadyRef = useRef(false);
+  const winFlashActiveRef = useRef(false);
 
   useEffect(() => {
     if (!spinning) return;
@@ -228,7 +237,11 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
   // ── One-time scene setup ──────────────────────────────────────────────────
   useEffect(() => {
     spineFxReadyRef.current = false;
-    void Promise.all([ensureBlastSpineLoaded(), ensureExplosionSpineLoaded()]).then(() => {
+    void Promise.all([
+      ensureBlastSpineLoaded(),
+      ensureExplosionSpineLoaded(),
+      ensureGloveSpineLoaded(),
+    ]).then(() => {
       spineFxReadyRef.current = true;
     });
 
@@ -328,6 +341,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
         clearTimeout(winFlashTimer);
         winFlashTimer = null;
       }
+      winFlashActiveRef.current = false;
       for (const h of winCells) {
         const removed = h.removeChildren();
         for (const d of removed) {
@@ -346,6 +360,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
       } catch {
         return;
       }
+      winFlashActiveRef.current = true;
       let flashMs = 1000;
       for (let i = 0; i < REEL_COUNT; i++) {
         const spine = createWinFrameSpine({ ticker: app.ticker, loop: false });
@@ -386,6 +401,13 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
             if (b.parent) b.parent.removeChild(b);
             b.destroy();
           }
+          if (slot.gloveFx) {
+            const g = slot.gloveFx;
+            slot.gloveFx = undefined;
+            slot.gloveAnim = undefined;
+            if (g.parent) g.parent.removeChild(g);
+            g.destroy();
+          }
           slot.label.visible = true;
         }
       }
@@ -420,6 +442,44 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
       }
       slot.label.visible = false;
       layoutBlastInRect(slot.blastFx!, SYMBOL_W, SYMBOL_H, 1.05);
+    }
+
+    function syncGloveFxForSlot(slot: Slot) {
+      const wantGlove =
+        spineFxReadyRef.current &&
+        slot.symId === SYM_GLOVE &&
+        isSlotInVisibleStrip(slot.container.y);
+
+      if (!wantGlove) {
+        if (slot.gloveFx) {
+          const g = slot.gloveFx;
+          slot.gloveFx = undefined;
+          slot.gloveAnim = undefined;
+          if (g.parent) g.parent.removeChild(g);
+          g.destroy();
+        }
+        return;
+      }
+
+      if (!slot.gloveFx) {
+        const spine = createGloveSpine({ ticker: app.ticker, loop: true, animation: 'Idle' });
+        slot.gloveFx = spine;
+        slot.gloveAnim = 'Idle';
+        spine.zIndex = 2;
+        slot.container.addChild(spine);
+      }
+
+      // Default: Idle. If the symbol is in the center row while win-frame flash is active → Action.
+      const rowIndex = slot.container.y / SYMBOL_H;
+      const isCenterRow = Math.abs(rowIndex - 1) < 0.05;
+      const desired = winFlashActiveRef.current && isCenterRow ? 'Action' : 'Idle';
+      if (slot.gloveAnim !== desired) {
+        slot.gloveFx.state.setAnimation(0, desired, true);
+        slot.gloveAnim = desired;
+      }
+
+      slot.label.visible = false;
+      layoutGloveInRect(slot.gloveFx, SYMBOL_W, SYMBOL_H, 1.05);
     }
 
     async function flashPostStopExplosions(mat: number[][]) {
@@ -546,6 +606,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
             paintSlot(s, randomSymId());
           }
           syncBlastFxForSlot(s);
+          syncGloveFxForSlot(s);
         }
       }
     };

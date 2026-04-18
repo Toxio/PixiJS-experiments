@@ -81,3 +81,20 @@ export function layoutGloveOnScreen(
     screenH / 2 - (lb.y + lb.height / 2) * s,
   );
 }
+
+/** Fit into one symbol cell on the reel grid. */
+export function layoutGloveInRect(spine: Spine, width: number, height: number, pad = 1.05): void {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return;
+  }
+  spine.update(0);
+  const lb = spine.getLocalBounds();
+  const bw = lb.width > 0 ? lb.width : 1;
+  const bh = lb.height > 0 ? lb.height : 1;
+  const s = Math.min((width * pad) / bw, (height * pad) / bh);
+  spine.scale.set(s);
+  spine.position.set(
+    width / 2 - (lb.x + lb.width / 2) * s,
+    height / 2 - (lb.y + lb.height / 2) * s,
+  );
+}
