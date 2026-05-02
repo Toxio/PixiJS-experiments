@@ -3,7 +3,7 @@ import * as signalR from '@microsoft/signalr';
 export const SLOTS_HUB_URL = 'https://slotgamesapi.yogames.win/slots';
 
 /** Value for `InitialState` `GameName` (required by the slots API). */
-export const SLOTS_INITIAL_STATE_GAME_NAME = 'ShiningCrown';
+export const SLOTS_INITIAL_STATE_GAME_NAME = 'RoyalCrown';
 
 export const DEFAULT_SLOTS_INITIAL_STATE = {
   GameName: SLOTS_INITIAL_STATE_GAME_NAME,

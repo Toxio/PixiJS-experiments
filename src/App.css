@@ -362,12 +362,25 @@ body,
   pointer-events: all;
 }
 
+/* Side controls on edges; bet strip absolutely centered on the full bar width */
 .sc-bottom-bar {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 12px;
+  width: 100%;
+  min-height: 44px;
   pointer-events: all;
+}
+
+.sc-bottom-bar-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 
 .sc-stat {
@@ -411,14 +424,93 @@ body,
   color: #ff6b6b;
 }
 
-/* Quick bet chips */
-.sc-quick-bets {
+/* Quick bets: ~5 chips wide, arrows + hidden scrollbar — true horizontal center */
+.sc-quick-bets-wrap {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  gap: 6px;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  max-width: min(calc(5 * 3rem + 4 * 6px + 64px), calc(100% - 200px));
+  z-index: 1;
+  pointer-events: all;
+}
+
+.sc-quick-bets-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sc-quick-bets-arrow {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffd700;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s,
+    opacity 0.15s;
+}
+
+.sc-quick-bets-arrow:hover:not(:disabled) {
+  border-color: rgba(255, 215, 0, 0.75);
+  color: #fff;
+  background: rgba(255, 215, 0, 0.12);
+}
+
+.sc-quick-bets-arrow:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* 5 × chip min-width + 4 × gap (must match .sc-bet-chip min-width and gap below) */
+.sc-quick-bets {
+  --sc-bet-chip-min: 3rem;
+  --sc-bet-gap: 6px;
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(100%, calc(5 * var(--sc-bet-chip-min) + 4 * var(--sc-bet-gap)));
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: var(--sc-bet-gap);
+  padding: 4px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sc-quick-bets::-webkit-scrollbar {
+  display: none;
 }
 
 .sc-bet-chip {
-  padding: 6px 13px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-width: var(--sc-bet-chip-min, 3rem);
+  padding: 6px 10px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
   border-radius: 20px;
   border: 1px solid rgba(255, 215, 0, 0.28);
   background: rgba(0, 0, 0, 0.6);
@@ -451,6 +543,9 @@ body,
 
 /* Speed selector pill */
 .sc-speed-selector {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   background: rgba(0, 0, 0, 0.55);

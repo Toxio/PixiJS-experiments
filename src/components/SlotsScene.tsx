@@ -1,10 +1,11 @@
 import { Application } from '@pixi/react';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSlotsHubSignalR } from '../hooks/useSlotsHubSignalR';
 import { SlotReels } from './SlotReels';
 
 export function SlotsScene() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const quickBetsRef = useRef<HTMLDivElement>(null);
   // 1 = slow (~2 s), 2 = normal (~1 s), 3 = fast (~0.4 s)
   const [spinSpeed, setSpinSpeed] = useState<1 | 2 | 3>(1);
 
@@ -23,6 +24,38 @@ export function SlotsScene() {
     spin,
     handleSpinComplete,
   } = useSlotsHubSignalR({ spinSpeed });
+
+  const [quickBetsScroll, setQuickBetsScroll] = useState({ atStart: true, atEnd: true });
+
+  const updateQuickBetsScrollEdges = useCallback(() => {
+    const el = quickBetsRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const epsilon = 2;
+    setQuickBetsScroll({
+      atStart: scrollLeft <= epsilon,
+      atEnd: scrollLeft + clientWidth >= scrollWidth - epsilon,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    updateQuickBetsScrollEdges();
+  }, [quickBets, updateQuickBetsScrollEdges]);
+
+  useEffect(() => {
+    const el = quickBetsRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => updateQuickBetsScrollEdges());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [updateQuickBetsScrollEdges]);
+
+  const scrollQuickBets = useCallback((direction: -1 | 1) => {
+    const el = quickBetsRef.current;
+    if (!el) return;
+    const step = Math.max(el.clientWidth * 0.65, 120);
+    el.scrollBy({ left: direction * step, behavior: 'smooth' });
+  }, []);
 
   return (
     <div ref={containerRef} className="canvas-wrapper">
@@ -92,31 +125,59 @@ export function SlotsScene() {
             ))}
           </div>
 
-          <div className="sc-quick-bets">
-            {quickBets.map((b) => (
+          <div className="sc-quick-bets-wrap">
+            <div className="sc-quick-bets-row">
               <button
-                key={b}
-                className={`sc-bet-chip${betAmount === b ? ' sc-bet-chip--active' : ''}`}
-                onClick={() => setBetAmount(b)}
-                disabled={spinning}
+                type="button"
+                className="sc-quick-bets-arrow sc-quick-bets-arrow--prev"
+                aria-label="Scroll bets left"
+                disabled={spinning || quickBetsScroll.atStart}
+                onClick={() => scrollQuickBets(-1)}
               >
-                {b}
+                ‹
               </button>
-            ))}
+              <div
+                ref={quickBetsRef}
+                className="sc-quick-bets"
+                onScroll={updateQuickBetsScrollEdges}
+              >
+                {quickBets.map((b) => (
+                  <button
+                    key={b}
+                    className={`sc-bet-chip${betAmount === b ? ' sc-bet-chip--active' : ''}`}
+                    onClick={() => setBetAmount(b)}
+                    disabled={spinning}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="sc-quick-bets-arrow sc-quick-bets-arrow--next"
+                aria-label="Scroll bets right"
+                disabled={spinning || quickBetsScroll.atEnd}
+                onClick={() => scrollQuickBets(1)}
+              >
+                ›
+              </button>
+            </div>
           </div>
 
-          <div className="sc-stat sc-bet-stat">
-            <span className="sc-stat-label">Bet</span>
-            <span className="sc-stat-value">{betAmount.toFixed(2)}</span>
-          </div>
+          <div className="sc-bottom-bar-end">
+            <div className="sc-stat sc-bet-stat">
+              <span className="sc-stat-label">Bet</span>
+              <span className="sc-stat-value">{betAmount.toFixed(2)}</span>
+            </div>
 
-          <button
-            className={`sc-spin-btn${spinning ? ' sc-spin-btn--spinning' : ''}`}
-            onClick={spin}
-            disabled={spinning || status !== 'ready'}
-          >
-            {spinning ? '◉' : 'SPIN'}
-          </button>
+            <button
+              className={`sc-spin-btn${spinning ? ' sc-spin-btn--spinning' : ''}`}
+              onClick={spin}
+              disabled={spinning || status !== 'ready'}
+            >
+              {spinning ? '◉' : 'SPIN'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
