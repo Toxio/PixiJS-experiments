@@ -11,6 +11,12 @@ import { createSlotsHubConnection, DEFAULT_SLOTS_INITIAL_STATE } from '../api/sl
 
 export type ConnStatus = 'connecting' | 'ready' | 'error';
 
+/**
+ * One line win from the server. `symbol` is the paytable / combo symbol used to
+ * price the win (e.g. lemon), not the texture in every highlighted cell — expanding
+ * wilds and substitution mean adjacent cells can still show 👑 / 🔔 while counting
+ * toward that same `symbol`.
+ */
 export interface WinLine {
   symbol: number;
   line: number;
@@ -40,6 +46,9 @@ export interface SlotsHubSignalRState {
   handleSpinComplete: () => void;
 }
 
+const REEL_COUNT = 5;
+const VISIBLE_ROWS = 3;
+
 function defaultMatrix(): number[][] {
   return [
     [9, 6, 0],
@@ -48,6 +57,44 @@ function defaultMatrix(): number[][] {
     [6, 7, 8],
     [9, 0, 1],
   ];
+}
+
+function isNumberMatrix(m: unknown): m is number[][] {
+  return Array.isArray(m) && m.length > 0 && m.every((row) => Array.isArray(row) && row.length > 0);
+}
+
+/** Server sends `[reel][row]` (5×3). If we get 3×5 (rows × reels), transpose. */
+function normalizeSpinMatrix(raw: number[][]): number[][] {
+  let cols = raw;
+  if (cols.length === VISIBLE_ROWS && cols[0] && cols[0].length === REEL_COUNT) {
+    cols = Array.from({ length: REEL_COUNT }, (_, c) => [
+      Number(cols[0][c]) || 0,
+      Number(cols[1][c]) || 0,
+      Number(cols[2][c]) || 0,
+    ]);
+  }
+  const out: number[][] = [];
+  for (let i = 0; i < REEL_COUNT; i++) {
+    const col = cols[i] ?? [];
+    out.push([Number(col[0]) || 0, Number(col[1]) || 0, Number(col[2]) || 0]);
+  }
+  return out;
+}
+
+function matrixFromRecord(obj: Record<string, unknown> | undefined): number[][] | undefined {
+  if (!obj) return undefined;
+  const raw = (obj.Matrix ?? obj.matrix) as unknown;
+  if (!isNumberMatrix(raw)) return undefined;
+  return normalizeSpinMatrix(raw);
+}
+
+/** Spin payload: `result.result.matrix` or `result.matrix` (see GameActionResult). */
+function extractSpinMatrixFromGameAction(data: Record<string, unknown>): number[][] | undefined {
+  const payload = (data.Result ?? data.result) as Record<string, unknown> | undefined;
+  const inner = payload
+    ? ((payload.Result ?? payload.result) as Record<string, unknown> | undefined)
+    : undefined;
+  return matrixFromRecord(inner) ?? matrixFromRecord(payload) ?? matrixFromRecord(data);
 }
 
 export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): SlotsHubSignalRState {
@@ -71,8 +118,8 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
       console.log('InitialStateResult', data);
       setBalance(Number(data.Balance ?? data.balance ?? 0));
       setCurrency(String(data.CurrencyCode ?? data.currencyCode ?? 'USD'));
-      const mat = (data.Matrix ?? data.matrix) as number[][] | undefined;
-      if (mat) setMatrix(mat);
+      const matRaw = (data.Matrix ?? data.matrix) as unknown;
+      if (isNumberMatrix(matRaw)) setMatrix(normalizeSpinMatrix(matRaw));
       const qb = (data.QuickBets ?? data.quickBets) as number[] | undefined;
       if (qb?.length) setQuickBets(qb);
       const dba = Number(data.DefaultBetAmount ?? data.defaultBetAmount ?? 0);
@@ -86,7 +133,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
       const spinResult = (payload?.Result ?? payload?.result) as
         | Record<string, unknown>
         | undefined;
-      const mat = (spinResult?.Matrix ?? spinResult?.matrix) as number[][] | undefined;
+      const mat = extractSpinMatrixFromGameAction(data);
       const additional = (spinResult?.Additional ?? spinResult?.additional) as
         | Record<string, unknown>
         | undefined;
@@ -107,7 +154,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
           winAmount: Number(w.LineWinAmount ?? w.lineWinAmount),
         })),
       );
-      if (mat) setTargetMatrix(mat);
+      if (mat?.length) setTargetMatrix(mat);
     });
 
     connRef.current = connection;

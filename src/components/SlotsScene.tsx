@@ -64,6 +64,7 @@ export function SlotsScene() {
           matrix={matrix}
           spinning={spinning}
           targetMatrix={targetMatrix}
+          winLines={winLines}
           onSpinComplete={handleSpinComplete}
           spinSpeed={spinSpeed}
         />
@@ -99,16 +100,6 @@ export function SlotsScene() {
             </div>
           )}
         </div>
-
-        {winLines.length > 0 && !spinning && (
-          <div className="sc-win-lines">
-            {winLines.map((w, i) => (
-              <span key={i} className="sc-win-chip">
-                Line {w.line} · ×{w.count} · {w.winAmount.toFixed(2)}
-              </span>
-            ))}
-          </div>
-        )}
 
         <div className="sc-bottom-bar">
           <div className="sc-speed-selector">

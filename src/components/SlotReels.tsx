@@ -31,6 +31,8 @@ import {
   ensureGloveSpineLoaded,
   layoutGloveInRect,
 } from '../animation/gloveSpine';
+import type { WinLine } from '../hooks/useSlotsHubSignalR';
+import { getPaylineForLineId } from '../slot/paylines';
 
 // ─── Layout ─────────────────────────────────────────────────────────────────
 const REEL_COUNT = 5;
@@ -45,7 +47,6 @@ const VISIBLE_ROWS = 3;
  * `reel.slots[1..3]` map to top / middle / bottom of the visible window.
  * Top-left of the middle cell is `y = SYMBOL_H` (not `2 * SYMBOL_H`, which is the bottom row).
  */
-const CENTER_ROW_TOP_Y = SYMBOL_H;
 
 // Post-stop overlay visibility uses one full Spine `Action` duration (see `getSpineAnimationDurationMs`).
 
@@ -143,6 +144,13 @@ function isSlotInVisibleStrip(containerY: number): boolean {
   return containerY > -SYMBOL_H * 0.5 && containerY < VISIBLE_ROWS * SYMBOL_H;
 }
 
+/** Visible row index 0–2 from reel-local slot Y (matches matrix[..][row]). */
+function visibleRowIndex(containerY: number): number | null {
+  const r = Math.round(containerY / SYMBOL_H);
+  if (r < 0 || r >= VISIBLE_ROWS) return null;
+  return r;
+}
+
 function paintSlot(slot: Slot, id: number) {
   slot.symId = id;
   const sym = SYMS[id] ?? '?';
@@ -186,17 +194,27 @@ interface Props {
   matrix: number[][];
   spinning: boolean;
   targetMatrix: number[][] | null;
+  winLines: WinLine[];
   onSpinComplete: () => void;
   spinSpeed: 1 | 2 | 3;
 }
 
-export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spinSpeed }: Props) {
+export function SlotReels({
+  matrix,
+  spinning,
+  targetMatrix,
+  winLines,
+  onSpinComplete,
+  spinSpeed,
+}: Props) {
   const { app } = useApplication();
 
   const spinRef = useRef(spinning);
   const targetRef = useRef(targetMatrix);
   const completeRef = useRef(onSpinComplete);
   const speedRef = useRef(spinSpeed);
+  const winLinesRef = useRef<WinLine[]>(winLines);
+  const winHighlightCellsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     spinRef.current = spinning;
   }, [spinning]);
@@ -209,6 +227,9 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
   useEffect(() => {
     speedRef.current = spinSpeed;
   }, [spinSpeed]);
+  useEffect(() => {
+    winLinesRef.current = winLines;
+  }, [winLines]);
 
   const reelsRef = useRef<Reel[]>([]);
   const tweensRef = useRef<Tween[]>([]);
@@ -233,6 +254,19 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
     clearLemonBlastsRef.current?.();
     clearCrownFlashRef.current?.();
   }, [spinning]);
+
+  // Keep visible cells in sync with server / React state (InitialState, recovery) — setup only runs once
+  useEffect(() => {
+    if (spinning) return;
+    const reels = reelsRef.current;
+    if (reels.length === 0) return;
+    for (let i = 0; i < REEL_COUNT; i++) {
+      const reel = reels[i];
+      paintSlot(reel.slots[1], matrix[i]?.[0] ?? 0);
+      paintSlot(reel.slots[2], matrix[i]?.[1] ?? 0);
+      paintSlot(reel.slots[3], matrix[i]?.[2] ?? 0);
+    }
+  }, [matrix, spinning]);
 
   // ── One-time scene setup ──────────────────────────────────────────────────
   useEffect(() => {
@@ -323,54 +357,52 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
     const winLineLayer = new Container();
     winLineLayer.zIndex = 100;
     winLineLayer.eventMode = 'none';
-
-    const winCells: Container[] = [];
-    for (let i = 0; i < REEL_COUNT; i++) {
-      const holder = new Container();
-      holder.x = i * (SYMBOL_W + REEL_GAP);
-      holder.y = CENTER_ROW_TOP_Y;
-      winLineLayer.addChild(holder);
-      winCells.push(holder);
-    }
     reelCont.addChild(winLineLayer);
 
-    let winFlashTimer: ReturnType<typeof setTimeout> | null = null;
-
     function clearWinLineFlash() {
-      if (winFlashTimer !== null) {
-        clearTimeout(winFlashTimer);
-        winFlashTimer = null;
-      }
       winFlashActiveRef.current = false;
-      for (const h of winCells) {
-        const removed = h.removeChildren();
-        for (const d of removed) {
-          if (d.parent) {
-            d.parent.removeChild(d);
-          }
-          d.destroy();
-        }
+      winHighlightCellsRef.current = new Set();
+      for (const c of winLineLayer.removeChildren()) {
+        c.destroy({ children: true });
       }
     }
 
-    async function flashWinLineFrames() {
+    /** Win frames stay until the next spin (`spinning` clears via ref). */
+    async function flashWinFramesForWins() {
       clearWinLineFlash();
+      const wins = winLinesRef.current;
+      if (wins.length === 0) return;
       try {
         await ensureWinFrameSpineLoaded();
       } catch {
         return;
       }
-      winFlashActiveRef.current = true;
-      let flashMs = 1000;
-      for (let i = 0; i < REEL_COUNT; i++) {
-        const spine = createWinFrameSpine({ ticker: app.ticker, loop: false });
-        if (i === 0) flashMs = getSpineAnimationDurationMs(spine, 'Action');
-        layoutWinFrameInRect(spine, SYMBOL_W, SYMBOL_H, 1.05);
-        winCells[i].addChild(spine);
+      // Union of (reel, row) for the first `count` stops on each payline — can show
+      // mixed sprites when wilds substitute; `WinLine.symbol` is still one paytable id.
+      const cellKeys = new Set<string>();
+      for (const w of wins) {
+        const path = getPaylineForLineId(w.line);
+        if (!path) continue;
+        const n = Math.min(Math.max(1, w.count), REEL_COUNT);
+        for (let reelIdx = 0; reelIdx < n; reelIdx++) {
+          cellKeys.add(`${reelIdx},${path[reelIdx]}`);
+        }
       }
-      winFlashTimer = setTimeout(() => {
-        clearWinLineFlash();
-      }, flashMs);
+      if (cellKeys.size === 0) return;
+      winHighlightCellsRef.current = cellKeys;
+      winFlashActiveRef.current = true;
+      for (const key of cellKeys) {
+        const [rs, ys] = key.split(',');
+        const reelI = Number(rs);
+        const rowI = Number(ys);
+        const holder = new Container();
+        holder.x = reelI * (SYMBOL_W + REEL_GAP);
+        holder.y = rowI * SYMBOL_H;
+        winLineLayer.addChild(holder);
+        const spine = createWinFrameSpine({ ticker: app.ticker, loop: true });
+        layoutWinFrameInRect(spine, SYMBOL_W, SYMBOL_H, 1.05);
+        holder.addChild(spine);
+      }
     }
 
     clearWinFlashRef.current = clearWinLineFlash;
@@ -444,7 +476,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
       layoutBlastInRect(slot.blastFx!, SYMBOL_W, SYMBOL_H, 1.05);
     }
 
-    function syncGloveFxForSlot(slot: Slot) {
+    function syncGloveFxForSlot(reelIndex: number, slot: Slot) {
       const wantGlove =
         spineFxReadyRef.current &&
         slot.symId === SYM_GLOVE &&
@@ -469,10 +501,12 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
         slot.container.addChild(spine);
       }
 
-      // Default: Idle. If the symbol is in the center row while win-frame flash is active → Action.
-      const rowIndex = slot.container.y / SYMBOL_H;
-      const isCenterRow = Math.abs(rowIndex - 1) < 0.05;
-      const desired = winFlashActiveRef.current && isCenterRow ? 'Action' : 'Idle';
+      const visRow = visibleRowIndex(slot.container.y);
+      const inWin =
+        visRow !== null &&
+        winFlashActiveRef.current &&
+        winHighlightCellsRef.current.has(`${reelIndex},${visRow}`);
+      const desired: 'Idle' | 'Action' = inWin ? 'Action' : 'Idle';
       if (slot.gloveAnim !== desired) {
         slot.gloveFx.state.setAnimation(0, desired, true);
         slot.gloveAnim = desired;
@@ -568,7 +602,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
             onDone:
               i === REEL_COUNT - 1
                 ? () => {
-                    void flashWinLineFrames();
+                    void flashWinFramesForWins();
                     void flashPostStopExplosions(mat);
                     completeRef.current();
                   }
@@ -592,7 +626,8 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
       if (done.length) tweensRef.current = tweensRef.current.filter((t) => !done.includes(t));
 
       // Update reels
-      for (const reel of reels) {
+      for (let ri = 0; ri < reels.length; ri++) {
+        const reel = reels[ri];
         if (spinRef.current && !reel.stopping) reel.position += SPIN_SPEED / 60;
 
         reel.blur.blurY = Math.abs(reel.position - reel.prevPos) * 8;
@@ -606,7 +641,7 @@ export function SlotReels({ matrix, spinning, targetMatrix, onSpinComplete, spin
             paintSlot(s, randomSymId());
           }
           syncBlastFxForSlot(s);
-          syncGloveFxForSlot(s);
+          syncGloveFxForSlot(ri, s);
         }
       }
     };
