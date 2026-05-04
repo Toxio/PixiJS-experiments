@@ -1,5 +1,6 @@
 import reelImage from '../assets/reel.png';
 import { Glass } from './Glass';
+import { Goblet } from './Goblet';
 
 export function Main() {
   return (
@@ -7,6 +8,7 @@ export function Main() {
       <div className="main-reel-wrap">
         <img className="main-reel" src={reelImage} alt="Reel" decoding="async" />
         <Glass />
+        <Goblet />
       </div>
     </main>
   );
