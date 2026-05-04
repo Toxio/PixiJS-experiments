@@ -7,6 +7,7 @@ import { Parfume } from './Parfume';
 import { Rose } from './Rose';
 import { Seven } from './Seven';
 import { Star } from './Star';
+import { Wild } from './Wild';
 
 export function Main() {
   return (
@@ -21,6 +22,7 @@ export function Main() {
         <Rose />
         <Seven />
         <Star />
+        <Wild />
       </div>
     </main>
   );
