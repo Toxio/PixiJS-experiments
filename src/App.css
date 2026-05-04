@@ -65,10 +65,42 @@
   pointer-events: none;
 }
 
+.main-reel-parfume-host {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.main-reel-rose-host {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.main-reel-seven-host {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+}
+
+.main-reel-star-host {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
 .main-reel-glass-host canvas,
 .main-reel-goblet-host canvas,
 .main-reel-lips-host canvas,
-.main-reel-lipstick-host canvas {
+.main-reel-lipstick-host canvas,
+.main-reel-parfume-host canvas,
+.main-reel-rose-host canvas,
+.main-reel-seven-host canvas,
+.main-reel-star-host canvas {
   display: block;
   width: 100%;
   height: 100%;

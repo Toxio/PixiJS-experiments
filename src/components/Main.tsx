@@ -3,6 +3,10 @@ import { Glass } from './Glass';
 import { Goblet } from './Goblet';
 import { Lipstick } from './Lipstick';
 import { Lips } from './Lips';
+import { Parfume } from './Parfume';
+import { Rose } from './Rose';
+import { Seven } from './Seven';
+import { Star } from './Star';
 
 export function Main() {
   return (
@@ -13,6 +17,10 @@ export function Main() {
         <Goblet />
         <Lips />
         <Lipstick />
+        <Parfume />
+        <Rose />
+        <Seven />
+        <Star />
       </div>
     </main>
   );
