@@ -1,0 +1,7 @@
+parfume.png
+size:252,323
+filter:Linear,Linear
+pma:true
+parfume
+bounds:2,2,248,319
+offsets:1,1,250,321

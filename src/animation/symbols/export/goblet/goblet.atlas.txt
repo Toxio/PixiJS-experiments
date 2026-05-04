@@ -1,0 +1,7 @@
+goblet.png
+size:98,315
+filter:Linear,Linear
+pma:true
+goblet
+bounds:2,2,94,311
+offsets:2,1,97,313

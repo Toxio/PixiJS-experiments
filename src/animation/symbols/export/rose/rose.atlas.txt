@@ -1,0 +1,7 @@
+rose.png
+size:304,285
+filter:Linear,Linear
+pma:true
+rose
+bounds:2,2,300,281
+offsets:1,1,302,283

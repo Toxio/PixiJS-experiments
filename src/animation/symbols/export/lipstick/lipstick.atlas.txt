@@ -1,0 +1,7 @@
+lipstick.png
+size:141,310
+filter:Linear,Linear
+pma:true
+lipstick
+bounds:2,2,137,306
+offsets:1,1,139,308

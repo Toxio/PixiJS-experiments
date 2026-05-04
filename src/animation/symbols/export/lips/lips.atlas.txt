@@ -1,0 +1,7 @@
+lips.png
+size:314,220
+filter:Linear,Linear
+pma:true
+lips
+bounds:2,2,310,216
+offsets:2,2,313,219
