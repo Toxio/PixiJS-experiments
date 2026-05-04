@@ -20,9 +20,32 @@
   place-items: center;
 }
 
-.main-reel {
+.main-reel-wrap {
+  position: relative;
+  display: block;
   width: min(980px, 92vw);
   max-height: 85vh;
-  height: auto;
+  aspect-ratio: 1641 / 1022;
+}
+
+.main-reel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   display: block;
+}
+
+.main-reel-glass-host {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.main-reel-glass-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
