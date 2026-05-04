@@ -58,9 +58,17 @@
   pointer-events: none;
 }
 
+.main-reel-lipstick-host {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
 .main-reel-glass-host canvas,
 .main-reel-goblet-host canvas,
-.main-reel-lips-host canvas {
+.main-reel-lips-host canvas,
+.main-reel-lipstick-host canvas {
   display: block;
   width: 100%;
   height: 100%;

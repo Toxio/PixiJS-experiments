@@ -1,6 +1,7 @@
 import reelImage from '../assets/reel.png';
 import { Glass } from './Glass';
 import { Goblet } from './Goblet';
+import { Lipstick } from './Lipstick';
 import { Lips } from './Lips';
 
 export function Main() {
@@ -11,6 +12,7 @@ export function Main() {
         <Glass />
         <Goblet />
         <Lips />
+        <Lipstick />
       </div>
     </main>
   );
