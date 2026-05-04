@@ -1,0 +1,28 @@
+.app-page {
+  min-height: 100vh;
+  background-image: url('./assets/bg.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.app-overlay {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.main-screen {
+  width: 100%;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.main-reel {
+  width: min(980px, 92vw);
+  max-height: 85vh;
+  height: auto;
+  display: block;
+}
