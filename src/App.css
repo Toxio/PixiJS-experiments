@@ -100,6 +100,62 @@
   pointer-events: none;
 }
 
+/* ── SlotMachinePixi ──────────────────────────────────────────────────────── */
+.smp-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.smp-canvas {
+    width: min(680px, 92vw);
+    height: min(480px, 68vw);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow:
+        0 0 40px rgba(255, 165, 0, 0.25),
+        0 0 80px rgba(255, 100, 0, 0.1);
+}
+
+.smp-spin-btn {
+    padding: 14px 56px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #fff;
+    background: linear-gradient(135deg, #c8720a 0%, #f5a623 50%, #c8720a 100%);
+    border: none;
+    border-radius: 40px;
+    cursor: pointer;
+    box-shadow:
+        0 4px 16px rgba(245, 166, 35, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transition:
+        transform 0.1s ease,
+        box-shadow 0.1s ease,
+        opacity 0.15s ease;
+}
+
+.smp-spin-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow:
+        0 8px 24px rgba(245, 166, 35, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.smp-spin-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.smp-spin-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* ── End SlotMachinePixi ──────────────────────────────────────────────────── */
+
 .main-reel-glass-host canvas,
 .main-reel-goblet-host canvas,
 .main-reel-lips-host canvas,
