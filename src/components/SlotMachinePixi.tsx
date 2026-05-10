@@ -163,11 +163,6 @@ function SlotReelsPng({spinning, onSpinComplete}: SlotReelsPngProps) {
         const cellW = gridW / REEL_COUNT;
         const cellH = gridH / VISIBLE_ROWS;
 
-        // Placeholder dark background shown before textures finish loading
-        const darkBg = new Graphics();
-        darkBg.rect(0, 0, width, height).fill(0x0d0a1e);
-        app.stage.addChild(darkBg);
-
         // Container for reel columns — positioned at the grid inset
         const reelCont = new Container();
         reelCont.x = gridX;
@@ -181,10 +176,6 @@ function SlotReelsPng({spinning, onSpinComplete}: SlotReelsPngProps) {
             if (cancelled) return;
 
             loadedRef.current = true;
-
-            // Swap placeholder dark BG for the actual reel.png frame
-            app.stage.removeChild(darkBg);
-            darkBg.destroy();
 
             const bgSprite = new Sprite(Texture.from('reel'));
             bgSprite.width = width;
@@ -333,7 +324,7 @@ export function SlotMachinePixi() {
     return (
         <div className="smp-wrapper">
             <div ref={containerRef} className="smp-canvas">
-                <Application resizeTo={containerRef} background={0x0d0a1e} antialias>
+                <Application resizeTo={containerRef} antialias>
                     <SlotReelsPng spinning={spinning} onSpinComplete={handleSpinComplete}/>
                 </Application>
             </div>
