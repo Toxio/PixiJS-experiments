@@ -6,20 +6,24 @@
  * REEL_GRID defines where the cell grid sits inside the image.
  */
 
-import {Spine} from '@esotericsoftware/spine-pixi-v8';
-import {useApplication} from '@pixi/react';
-import {Assets, BlurFilter, Container, Graphics, Sprite, Texture, type Ticker} from 'pixi.js';
-import {useEffect, useRef} from 'react';
+import { Spine } from '@esotericsoftware/spine-pixi-v8';
+import { useApplication } from '@pixi/react';
+import { Assets, BlurFilter, Container, Graphics, Sprite, Texture, type Ticker } from 'pixi.js';
+import { useEffect, useRef } from 'react';
 
-import {createGlassSpine, ensureGlassSpineLoaded} from '../../animation/glassSpine';
-import {createGobletSpine, ensureGobletSpineLoaded} from '../../animation/gobletSpine';
-import {createPaylineAnimation, ensureLineAssetsLoaded, type PaylineAnimation,} from '../../animation/lineAnimation';
-import {createLipsSpine, ensureLipsSpineLoaded} from '../../animation/lipsSpine';
-import {createLipstickSpine, ensureLipstickSpineLoaded} from '../../animation/lipstickSpine';
-import {createParfumeSpine, ensureParfumeSpineLoaded} from '../../animation/parfumeSpine';
-import {createRoseSpine, ensureRoseSpineLoaded} from '../../animation/roseSpine';
-import {createSevenSpine, ensureSevenSpineLoaded} from '../../animation/sevenSpine';
-import {createStarSpine, ensureStarSpineLoaded} from '../../animation/starSpine';
+import { createGlassSpine, ensureGlassSpineLoaded } from '../../animation/glassSpine';
+import { createGobletSpine, ensureGobletSpineLoaded } from '../../animation/gobletSpine';
+import {
+  createPaylineAnimation,
+  ensureLineAssetsLoaded,
+  type PaylineAnimation,
+} from '../../animation/lineAnimation';
+import { createLipsSpine, ensureLipsSpineLoaded } from '../../animation/lipsSpine';
+import { createLipstickSpine, ensureLipstickSpineLoaded } from '../../animation/lipstickSpine';
+import { createParfumeSpine, ensureParfumeSpineLoaded } from '../../animation/parfumeSpine';
+import { createRoseSpine, ensureRoseSpineLoaded } from '../../animation/roseSpine';
+import { createSevenSpine, ensureSevenSpineLoaded } from '../../animation/sevenSpine';
+import { createStarSpine, ensureStarSpineLoaded } from '../../animation/starSpine';
 import reelImg from '../../assets/reel.png';
 import glassImg from '../../assets/symbols/images/glass.png';
 import gobletImg from '../../assets/symbols/images/goblet.png';
@@ -29,11 +33,11 @@ import parfumeImg from '../../assets/symbols/images/parfume.png';
 import roseImg from '../../assets/symbols/images/rose.png';
 import sevenImg from '../../assets/symbols/images/seven.png';
 import starImg from '../../assets/symbols/images/star.png';
-import type {WinLine} from '../../hooks/useSlotsHubSignalR';
-import {getPaylineForLineId} from '../../slot/paylines';
+import type { WinLine } from '../../hooks/useSlotsHubSignalR';
+import { getPaylineForLineId } from '../../slot/paylines';
 
 // ── Grid UV inset — pixel-precise from the pink divider lines in reel.png (1641×1022).
-const REEL_GRID = {x: 0.01, y: 0.038, w: 0.962, h: 0.957} as const;
+const REEL_GRID = { x: 0.01, y: 0.038, w: 0.962, h: 0.957 } as const;
 
 const REEL_COUNT = 5;
 const VISIBLE_ROWS = 3;
@@ -41,9 +45,9 @@ const REEL_SIZE = 10; // virtual loop length (must be > VISIBLE_ROWS + 1)
 const SPIN_SPEED = 25;
 
 const SPEED = {
-    minSpin: 300,
-    stopBase: 280,
-    stopStep: 140,
+  minSpin: 300,
+  stopBase: 280,
+  stopStep: 140,
 };
 
 // ── Win animation timing ──────────────────────────────────────────────────────
@@ -56,530 +60,539 @@ const LINE_DELAY_MS = 300;
 
 /** One cell that participates in a win line. */
 interface WinCell {
-    col: number;
-    row: number;
-    symIdx: number;
+  col: number;
+  row: number;
+  symIdx: number;
 }
 
 const ALL_ASSETS = [
-    {alias: 'reel', src: reelImg},
-    {alias: 'glass', src: glassImg},
-    {alias: 'goblet', src: gobletImg},
-    {alias: 'lips', src: lipsImg},
-    {alias: 'lipstick', src: lipstickImg},
-    {alias: 'parfume', src: parfumeImg},
-    {alias: 'rose', src: roseImg},
-    {alias: 'seven', src: sevenImg},
-    {alias: 'star', src: starImg},
+  { alias: 'reel', src: reelImg },
+  { alias: 'glass', src: glassImg },
+  { alias: 'goblet', src: gobletImg },
+  { alias: 'lips', src: lipsImg },
+  { alias: 'lipstick', src: lipstickImg },
+  { alias: 'parfume', src: parfumeImg },
+  { alias: 'rose', src: roseImg },
+  { alias: 'seven', src: sevenImg },
+  { alias: 'star', src: starImg },
 ];
 
 const SYMBOL_ALIASES = ALL_ASSETS.slice(1).map((a) => a.alias);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function lerp(a: number, b: number, t: number) {
-    return a * (1 - t) + b * t;
+  return a * (1 - t) + b * t;
 }
 
 function backout(amount: number) {
-    return (t: number) => --t * t * ((amount + 1) * t + amount) + 1;
+  return (t: number) => --t * t * ((amount + 1) * t + amount) + 1;
 }
 
 function randomAlias() {
-    return SYMBOL_ALIASES[Math.floor(Math.random() * SYMBOL_ALIASES.length)];
+  return SYMBOL_ALIASES[Math.floor(Math.random() * SYMBOL_ALIASES.length)];
 }
 
 /** Create the win-animation Spine for a given symbol index (0–7). */
 function createWinSpineForSymbol(symIdx: number, ticker: Ticker): Spine | null {
-    switch (symIdx) {
-        case 0:
-            return createGlassSpine({loop: true, animation: 'win', ticker});
-        case 1:
-            return createGobletSpine({loop: true, ticker});
-        case 2:
-            return createLipsSpine({loop: true, animation: 'win', ticker});
-        case 3:
-            return createLipstickSpine({loop: true, ticker});
-        case 4:
-            return createParfumeSpine({loop: true, ticker});
-        case 5:
-            return createRoseSpine({loop: true, ticker});
-        case 6:
-            return createSevenSpine({loop: true, ticker});
-        case 7:
-            return createStarSpine({loop: true, animation: 'win', ticker});
-        default:
-            return null;
-    }
+  switch (symIdx) {
+    case 0:
+      return createGlassSpine({ loop: true, animation: 'win', ticker });
+    case 1:
+      return createGobletSpine({ loop: true, ticker });
+    case 2:
+      return createLipsSpine({ loop: true, animation: 'win', ticker });
+    case 3:
+      return createLipstickSpine({ loop: true, ticker });
+    case 4:
+      return createParfumeSpine({ loop: true, ticker });
+    case 5:
+      return createRoseSpine({ loop: true, ticker });
+    case 6:
+      return createSevenSpine({ loop: true, ticker });
+    case 7:
+      return createStarSpine({ loop: true, animation: 'win', ticker });
+    default:
+      return null;
+  }
 }
 
 const SPINE_CELL_SCALE = 0.82;
 
 /** Scale and centre a Spine so it fits inside one reel cell (same padding as static sprites). */
 function layoutSpineInCell(
-    spine: Spine,
-    absX: number,
-    absY: number,
-    cellW: number,
-    cellH: number,
+  spine: Spine,
+  absX: number,
+  absY: number,
+  cellW: number,
+  cellH: number,
 ): void {
-    spine.update(0);
-    const lb = spine.getLocalBounds();
-    const bw = lb.width > 0 ? lb.width : 1;
-    const bh = lb.height > 0 ? lb.height : 1;
-    const s = Math.min((cellW * SPINE_CELL_SCALE) / bw, (cellH * SPINE_CELL_SCALE) / bh);
-    spine.scale.set(s);
-    spine.position.set(absX - (lb.x + lb.width / 2) * s, absY - (lb.y + lb.height / 2) * s);
+  spine.update(0);
+  const lb = spine.getLocalBounds();
+  const bw = lb.width > 0 ? lb.width : 1;
+  const bh = lb.height > 0 ? lb.height : 1;
+  const s = Math.min((cellW * SPINE_CELL_SCALE) / bw, (cellH * SPINE_CELL_SCALE) / bh);
+  spine.scale.set(s);
+  spine.position.set(absX - (lb.x + lb.width / 2) * s, absY - (lb.y + lb.height / 2) * s);
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────
 interface SlotSymbol {
-    container: Container;
-    sprite: Sprite;
+  container: Container;
+  sprite: Sprite;
 }
 
 interface Reel {
-    rc: Container;
-    symbols: SlotSymbol[];
-    position: number;
-    prevPos: number;
-    blur: BlurFilter;
-    stopping: boolean;
+  rc: Container;
+  symbols: SlotSymbol[];
+  position: number;
+  prevPos: number;
+  blur: BlurFilter;
+  stopping: boolean;
 }
 
 interface Tween {
-    reel: Reel;
-    from: number;
-    to: number;
-    startMs: number;
-    duration: number;
-    ease: (t: number) => number;
-    onDone?: () => void;
+  reel: Reel;
+  from: number;
+  to: number;
+  startMs: number;
+  duration: number;
+  ease: (t: number) => number;
+  onDone?: () => void;
 }
 
 // ── Sprite helpers ────────────────────────────────────────────────────────────
 function createSymbolSprite(alias: string, cw: number, ch: number): SlotSymbol {
-    const container = new Container();
-    const sprite = new Sprite(Texture.from(alias));
-    fitSprite(sprite, cw, ch);
-    container.addChild(sprite);
-    return {container, sprite};
+  const container = new Container();
+  const sprite = new Sprite(Texture.from(alias));
+  fitSprite(sprite, cw, ch);
+  container.addChild(sprite);
+  return { container, sprite };
 }
 
 function fitSprite(sprite: Sprite, cw: number, ch: number): void {
-    sprite.anchor.set(0.5);
-    sprite.x = cw / 2;
-    sprite.y = ch / 2;
-    const tw = sprite.texture.width || 1;
-    const th = sprite.texture.height || 1;
-    sprite.scale.set(Math.min((cw * 0.82) / tw, (ch * 0.82) / th));
+  sprite.anchor.set(0.5);
+  sprite.x = cw / 2;
+  sprite.y = ch / 2;
+  const tw = sprite.texture.width || 1;
+  const th = sprite.texture.height || 1;
+  sprite.scale.set(Math.min((cw * 0.82) / tw, (ch * 0.82) / th));
 }
 
 function updateSymbol(sym: SlotSymbol, alias: string, cw: number, ch: number): void {
-    sym.sprite.texture = Texture.from(alias);
-    fitSprite(sym.sprite, cw, ch);
+  sym.sprite.texture = Texture.from(alias);
+  fitSprite(sym.sprite, cw, ch);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export interface SlotReelsProps {
-    spinning: boolean;
-    targetMatrix: number[][] | null;
-    /** Settled matrix (5 reels × 3 rows) used to locate winning cells. */
-    matrix: number[][];
-    winLines: WinLine[];
-    onSpinComplete: () => void;
+  spinning: boolean;
+  targetMatrix: number[][] | null;
+  /** Settled matrix (5 reels × 3 rows) used to locate winning cells. */
+  matrix: number[][];
+  winLines: WinLine[];
+  onSpinComplete: () => void;
 }
 
-export function SlotReels({spinning, targetMatrix, matrix, onSpinComplete, winLines}: SlotReelsProps) {
-    const {app} = useApplication();
+export function SlotReels({
+  spinning,
+  targetMatrix,
+  matrix,
+  onSpinComplete,
+  winLines,
+}: SlotReelsProps) {
+  const { app } = useApplication();
 
-    const spinRef = useRef(spinning);
-    const completeRef = useRef(onSpinComplete);
-    const reelsRef = useRef<Reel[]>([]);
-    const tweensRef = useRef<Tween[]>([]);
-    const spinStartRef = useRef(0);
-    const stopFiredRef = useRef(false);
-    const loadedRef = useRef(false);
-    const targetMatrixRef = useRef<number[][] | null>(null);
+  const spinRef = useRef(spinning);
+  const completeRef = useRef(onSpinComplete);
+  const reelsRef = useRef<Reel[]>([]);
+  const tweensRef = useRef<Tween[]>([]);
+  const spinStartRef = useRef(0);
+  const stopFiredRef = useRef(false);
+  const loadedRef = useRef(false);
+  const targetMatrixRef = useRef<number[][] | null>(null);
 
-    const winOverlayRef = useRef<Container | null>(null);
-    const spineReadyRef = useRef(false);
+  const winOverlayRef = useRef<Container | null>(null);
+  const spineReadyRef = useRef(false);
 
-    const paylineLayerRef = useRef<Container | null>(null);
-    const paylineAnimsRef = useRef<PaylineAnimation[]>([]);
-    const paylineCycleIdxRef = useRef(0);
-    const paylineCycleElapsedRef = useRef(0);
+  const paylineLayerRef = useRef<Container | null>(null);
+  const paylineAnimsRef = useRef<PaylineAnimation[]>([]);
+  const paylineCycleIdxRef = useRef(0);
+  const paylineCycleElapsedRef = useRef(0);
 
-    /** Per win-line list of cells to animate (parallel to paylineAnimsRef). */
-    const winCellsByLineRef = useRef<WinCell[][]>([]);
-    /** Win-spine objects currently visible in the overlay (for the active line). */
-    const activeWinSpinesRef = useRef<Spine[]>([]);
-    /** True while we are in the blank-delay phase between two lines. */
-    const paylineInDelayRef = useRef(false);
-    /** Exposed by the one-time setup effect so the payline effect can trigger line 0. */
-    const activateWinLineRef = useRef<((idx: number) => void) | null>(null);
+  /** Per win-line list of cells to animate (parallel to paylineAnimsRef). */
+  const winCellsByLineRef = useRef<WinCell[][]>([]);
+  /** Win-spine objects currently visible in the overlay (for the active line). */
+  const activeWinSpinesRef = useRef<Spine[]>([]);
+  /** True while we are in the blank-delay phase between two lines. */
+  const paylineInDelayRef = useRef(false);
+  /** Exposed by the one-time setup effect so the payline effect can trigger line 0. */
+  const activateWinLineRef = useRef<((idx: number) => void) | null>(null);
 
-    useEffect(() => {
-        spinRef.current = spinning;
-    }, [spinning]);
+  useEffect(() => {
+    spinRef.current = spinning;
+  }, [spinning]);
 
-    useEffect(() => {
-        completeRef.current = onSpinComplete;
-    }, [onSpinComplete]);
+  useEffect(() => {
+    completeRef.current = onSpinComplete;
+  }, [onSpinComplete]);
 
-    useEffect(() => {
-        targetMatrixRef.current = targetMatrix;
-    }, [targetMatrix]);
+  useEffect(() => {
+    targetMatrixRef.current = targetMatrix;
+  }, [targetMatrix]);
 
-    // Clear win overlay and reset per-spin state when a new spin begins
-    useEffect(() => {
-        if (!spinning) return;
-        spinStartRef.current = Date.now();
-        stopFiredRef.current = false;
-        tweensRef.current = [];
-        reelsRef.current.forEach((r) => {
-            r.stopping = false;
-            r.symbols.forEach((sym) => {
-                sym.sprite.visible = true;
+  // Clear win overlay and reset per-spin state when a new spin begins
+  useEffect(() => {
+    if (!spinning) return;
+    spinStartRef.current = Date.now();
+    stopFiredRef.current = false;
+    tweensRef.current = [];
+    reelsRef.current.forEach((r) => {
+      r.stopping = false;
+      r.symbols.forEach((sym) => {
+        sym.sprite.visible = true;
+      });
+    });
+    // Destroy active win spines
+    for (const spine of activeWinSpinesRef.current) {
+      if (spine.parent) spine.parent.removeChild(spine);
+      spine.destroy();
+    }
+    activeWinSpinesRef.current = [];
+    winCellsByLineRef.current = [];
+    paylineInDelayRef.current = false;
+    winOverlayRef.current?.removeChildren();
+    for (const anim of paylineAnimsRef.current) anim.destroy();
+    paylineAnimsRef.current = [];
+    paylineLayerRef.current?.removeChildren();
+  }, [spinning]);
+
+  // Build payline + win-cell data whenever a new result arrives.
+  // Animations play sequentially: payline line + its symbol spines are shown
+  // together, then a brief blank delay, then the next line.
+  useEffect(() => {
+    if (spinning || !winLines.length) return;
+    const layer = paylineLayerRef.current;
+    if (!layer) return;
+
+    layer.removeChildren();
+    for (const a of paylineAnimsRef.current) a.destroy();
+    paylineAnimsRef.current = [];
+    winCellsByLineRef.current = [];
+    paylineCycleIdxRef.current = 0;
+    paylineCycleElapsedRef.current = 0;
+    paylineInDelayRef.current = false;
+
+    const { width, height } = app.screen;
+    const gridX = Math.round(width * REEL_GRID.x);
+    const gridY = Math.round(height * REEL_GRID.y);
+    const gridW = Math.round(width * REEL_GRID.w);
+    const gridH = Math.round(height * REEL_GRID.h);
+    const cellW = gridW / REEL_COUNT;
+    const cellH = gridH / VISIBLE_ROWS;
+
+    for (const win of winLines) {
+      const payline = getPaylineForLineId(win.line);
+      if (!payline) continue;
+
+      // Payline overlay animation
+      const anim = createPaylineAnimation(win.line, payline, {
+        gridX,
+        gridY,
+        cellW,
+        cellH,
+        ticker: app.ticker,
+      });
+      paylineAnimsRef.current.push(anim);
+
+      // Cells whose symbols should animate while this line is shown
+      const symIdx = win.symbol % SYMBOL_ALIASES.length;
+      const cells: WinCell[] = [];
+      for (let col = 0; col < win.count && col < REEL_COUNT; col++) {
+        const row = payline[col] ?? 1;
+        // Skip cells where the settled matrix shows a different symbol (wild sub)
+        if ((matrix[col]?.[row] ?? -1) % SYMBOL_ALIASES.length !== symIdx) continue;
+        cells.push({ col, row, symIdx });
+      }
+      winCellsByLineRef.current.push(cells);
+    }
+
+    // Immediately show the first line
+    if (paylineAnimsRef.current.length > 0) {
+      activateWinLineRef.current?.(0);
+    }
+  }, [spinning, winLines, matrix, app]);
+
+  // One-time scene setup
+  useEffect(() => {
+    const { width, height } = app.screen;
+
+    const gridX = Math.round(width * REEL_GRID.x);
+    const gridY = Math.round(height * REEL_GRID.y);
+    const gridW = Math.round(width * REEL_GRID.w);
+    const gridH = Math.round(height * REEL_GRID.h);
+    const cellW = gridW / REEL_COUNT;
+    const cellH = gridH / VISIBLE_ROWS;
+
+    const reelCont = new Container();
+    reelCont.x = gridX;
+    reelCont.y = gridY;
+    app.stage.addChild(reelCont);
+
+    // Payline layer sits between the reel grid and the symbol win overlay
+    const paylineLayer = new Container();
+    app.stage.addChild(paylineLayer);
+    paylineLayerRef.current = paylineLayer;
+
+    // Win overlay sits above the reels so spine animations are not clipped by reel masks
+    const winOverlayCont = new Container();
+    app.stage.addChild(winOverlayCont);
+    winOverlayRef.current = winOverlayCont;
+
+    let cancelled = false;
+
+    // Preload all spine assets in parallel with PNG assets
+    Promise.all([
+      ensureGlassSpineLoaded(),
+      ensureGobletSpineLoaded(),
+      ensureLipsSpineLoaded(),
+      ensureLipstickSpineLoaded(),
+      ensureParfumeSpineLoaded(),
+      ensureRoseSpineLoaded(),
+      ensureSevenSpineLoaded(),
+      ensureStarSpineLoaded(),
+      ensureLineAssetsLoaded(),
+    ])
+      .then(() => {
+        if (!cancelled) spineReadyRef.current = true;
+      })
+      .catch(() => {});
+
+    async function init() {
+      await Assets.load(ALL_ASSETS);
+      if (cancelled) return;
+
+      loadedRef.current = true;
+
+      const bgSprite = new Sprite(Texture.from('reel'));
+      bgSprite.width = width;
+      bgSprite.height = height;
+      app.stage.addChildAt(bgSprite, 0);
+
+      const reels: Reel[] = [];
+
+      for (let i = 0; i < REEL_COUNT; i++) {
+        const rc = new Container();
+        rc.x = i * cellW;
+        reelCont.addChild(rc);
+
+        const blur = new BlurFilter();
+        blur.blurX = 0;
+        blur.blurY = 0;
+        rc.filters = [blur];
+
+        // Mask clips each column to exactly cellW × (3 × cellH)
+        const mask = new Graphics();
+        mask.rect(0, 0, cellW, gridH).fill(0xffffff);
+        rc.addChild(mask);
+        rc.mask = mask;
+
+        const symbols: SlotSymbol[] = [];
+        for (let j = 0; j < REEL_SIZE; j++) {
+          const sym = createSymbolSprite(randomAlias(), cellW, cellH);
+          sym.container.y = j * cellH;
+          rc.addChild(sym.container);
+          symbols.push(sym);
+        }
+
+        reels.push({ rc, symbols, position: 0, prevPos: 0, blur, stopping: false });
+      }
+
+      reelsRef.current = reels;
+    }
+
+    void init();
+
+    // ── Win-line helpers (close over scene nodes and grid metrics) ────────────
+
+    /** Destroy active win spines, restore hidden static sprites, clear payline. */
+    function deactivateCurrentLine() {
+      for (const spine of activeWinSpinesRef.current) {
+        if (spine.parent) spine.parent.removeChild(spine);
+        spine.destroy();
+      }
+      activeWinSpinesRef.current = [];
+      for (const reel of reelsRef.current) {
+        for (const sym of reel.symbols) sym.sprite.visible = true;
+      }
+      paylineLayerRef.current?.removeChildren();
+    }
+
+    /** Show payline N + create win spines for its cells; hides prior line first. */
+    function activateWinLine(idx: number) {
+      deactivateCurrentLine();
+
+      const anims = paylineAnimsRef.current;
+      const layer = paylineLayerRef.current;
+      const overlay = winOverlayRef.current;
+      if (!layer || !overlay || idx >= anims.length) return;
+
+      layer.addChild(anims[idx].container);
+
+      if (!spineReadyRef.current) return;
+
+      const newSpines: Spine[] = [];
+      for (const { col, row, symIdx } of winCellsByLineRef.current[idx] ?? []) {
+        const spine = createWinSpineForSymbol(symIdx, app.ticker);
+        if (!spine) continue;
+        const absX = gridX + col * cellW + cellW / 2;
+        const absY = gridY + row * cellH + cellH / 2;
+        layoutSpineInCell(spine, absX, absY, cellW, cellH);
+        overlay.addChild(spine);
+        newSpines.push(spine);
+        const staticSym = reelsRef.current[col]?.symbols[row + 1];
+        if (staticSym) staticSym.sprite.visible = false;
+      }
+      activeWinSpinesRef.current = newSpines;
+    }
+
+    activateWinLineRef.current = activateWinLine;
+
+    const ease = backout(0.4);
+
+    const onTick = () => {
+      if (!loadedRef.current) return;
+
+      const now = Date.now();
+      const reels = reelsRef.current;
+
+      // Fire stop tweens after minSpin ms
+      if (
+        spinRef.current &&
+        !stopFiredRef.current &&
+        reels.length > 0 &&
+        now - spinStartRef.current >= SPEED.minSpin
+      ) {
+        stopFiredRef.current = true;
+
+        reels.forEach((reel, i) => {
+          reel.stopping = true;
+
+          const extraCycles = 2 + i;
+          const targetPos = (Math.ceil(reel.position / REEL_SIZE) + extraCycles) * REEL_SIZE;
+
+          // Stamp server symbols onto the visible slots at rest position.
+          // At position = any multiple of REEL_SIZE, visible symbols are indices 1, 2, 3.
+          const col = targetMatrixRef.current?.[i];
+          if (col) {
+            [1, 2, 3].forEach((symIdx, rowIdx) => {
+              const sym = reel.symbols[symIdx];
+              if (sym && col[rowIdx] !== undefined) {
+                updateSymbol(
+                  sym,
+                  SYMBOL_ALIASES[col[rowIdx] % SYMBOL_ALIASES.length],
+                  cellW,
+                  cellH,
+                );
+              }
             });
+          }
+
+          tweensRef.current.push({
+            reel,
+            from: reel.position,
+            to: targetPos,
+            startMs: now,
+            duration: SPEED.stopBase + i * SPEED.stopStep,
+            ease,
+            onDone: i === REEL_COUNT - 1 ? () => completeRef.current() : undefined,
+          });
         });
-        // Destroy active win spines
-        for (const spine of activeWinSpinesRef.current) {
-            if (spine.parent) spine.parent.removeChild(spine);
-            spine.destroy();
+      }
+
+      // Process active tweens
+      const done: Tween[] = [];
+      for (const tw of tweensRef.current) {
+        if (now < tw.startMs) continue;
+        const phase = Math.min(1, (now - tw.startMs) / tw.duration);
+        tw.reel.position = lerp(tw.from, tw.to, ease(phase));
+        if (phase >= 1) {
+          tw.reel.position = tw.to;
+          done.push(tw);
+          tw.onDone?.();
         }
-        activeWinSpinesRef.current = [];
-        winCellsByLineRef.current = [];
-        paylineInDelayRef.current = false;
-        winOverlayRef.current?.removeChildren();
-        for (const anim of paylineAnimsRef.current) anim.destroy();
-        paylineAnimsRef.current = [];
-        paylineLayerRef.current?.removeChildren();
-    }, [spinning]);
+      }
+      if (done.length) tweensRef.current = tweensRef.current.filter((t) => !done.includes(t));
 
-
-    // Build payline + win-cell data whenever a new result arrives.
-    // Animations play sequentially: payline line + its symbol spines are shown
-    // together, then a brief blank delay, then the next line.
-    useEffect(() => {
-        if (spinning || !winLines.length) return;
-        const layer = paylineLayerRef.current;
-        if (!layer) return;
-
-        layer.removeChildren();
-        for (const a of paylineAnimsRef.current) a.destroy();
-        paylineAnimsRef.current = [];
-        winCellsByLineRef.current = [];
-        paylineCycleIdxRef.current = 0;
-        paylineCycleElapsedRef.current = 0;
-        paylineInDelayRef.current = false;
-
-        const {width, height} = app.screen;
-        const gridX = Math.round(width * REEL_GRID.x);
-        const gridY = Math.round(height * REEL_GRID.y);
-        const gridW = Math.round(width * REEL_GRID.w);
-        const gridH = Math.round(height * REEL_GRID.h);
-        const cellW = gridW / REEL_COUNT;
-        const cellH = gridH / VISIBLE_ROWS;
-
-        for (const win of winLines) {
-            const payline = getPaylineForLineId(win.line);
-            if (!payline) continue;
-
-            // Payline overlay animation
-            const anim = createPaylineAnimation(win.line, payline, {
-                gridX,
-                gridY,
-                cellW,
-                cellH,
-                ticker: app.ticker
-            });
-            paylineAnimsRef.current.push(anim);
-
-            // Cells whose symbols should animate while this line is shown
-            const symIdx = win.symbol % SYMBOL_ALIASES.length;
-            const cells: WinCell[] = [];
-            for (let col = 0; col < win.count && col < REEL_COUNT; col++) {
-                const row = payline[col] ?? 1;
-                // Skip cells where the settled matrix shows a different symbol (wild sub)
-                if ((matrix[col]?.[row] ?? -1) % SYMBOL_ALIASES.length !== symIdx) continue;
-                cells.push({col, row, symIdx});
-            }
-            winCellsByLineRef.current.push(cells);
+      // Update every reel's symbol positions each frame
+      for (const reel of reels) {
+        if (spinRef.current && !reel.stopping) {
+          reel.position += SPIN_SPEED / 60;
         }
 
-        // Immediately show the first line
-        if (paylineAnimsRef.current.length > 0) {
-            activateWinLineRef.current?.(0);
+        reel.blur.blurY = Math.abs(reel.position - reel.prevPos) * 8;
+        reel.prevPos = reel.position;
+
+        for (let j = 0; j < reel.symbols.length; j++) {
+          const sym = reel.symbols[j];
+          const prevY = sym.container.y;
+          sym.container.y = ((reel.position + j) % REEL_SIZE) * cellH - cellH;
+
+          // Swap symbol when it wraps off the top (only while freely spinning)
+          if (sym.container.y < 0 && prevY > cellH && !reel.stopping) {
+            updateSymbol(sym, randomAlias(), cellW, cellH);
+          }
         }
-    }, [spinning, winLines, matrix, app]);
+      }
 
-    // One-time scene setup
-    useEffect(() => {
-        const {width, height} = app.screen;
+      // ── Payline sequential animation ─────────────────────────────────────────
+      // Show duration = exact Spine loop length (no mid-cycle cut-off).
+      // Cycle = showMs + LINE_DELAY_MS blank pause.
+      const anims = paylineAnimsRef.current;
+      if (!spinRef.current && anims.length > 0) {
+        const lineShowMs = anims[paylineCycleIdxRef.current]?.durationMs ?? 1000;
+        const lineCycleMs = lineShowMs + LINE_DELAY_MS;
 
-        const gridX = Math.round(width * REEL_GRID.x);
-        const gridY = Math.round(height * REEL_GRID.y);
-        const gridW = Math.round(width * REEL_GRID.w);
-        const gridH = Math.round(height * REEL_GRID.h);
-        const cellW = gridW / REEL_COUNT;
-        const cellH = gridH / VISIBLE_ROWS;
+        paylineCycleElapsedRef.current += app.ticker.deltaMS;
+        const elapsed = paylineCycleElapsedRef.current;
 
-        const reelCont = new Container();
-        reelCont.x = gridX;
-        reelCont.y = gridY;
-        app.stage.addChild(reelCont);
-
-        // Payline layer sits between the reel grid and the symbol win overlay
-        const paylineLayer = new Container();
-        app.stage.addChild(paylineLayer);
-        paylineLayerRef.current = paylineLayer;
-
-        // Win overlay sits above the reels so spine animations are not clipped by reel masks
-        const winOverlayCont = new Container();
-        app.stage.addChild(winOverlayCont);
-        winOverlayRef.current = winOverlayCont;
-
-        let cancelled = false;
-
-        // Preload all spine assets in parallel with PNG assets
-        Promise.all([
-            ensureGlassSpineLoaded(),
-            ensureGobletSpineLoaded(),
-            ensureLipsSpineLoaded(),
-            ensureLipstickSpineLoaded(),
-            ensureParfumeSpineLoaded(),
-            ensureRoseSpineLoaded(),
-            ensureSevenSpineLoaded(),
-            ensureStarSpineLoaded(),
-            ensureLineAssetsLoaded(),
-        ])
-            .then(() => {
-                if (!cancelled) spineReadyRef.current = true;
-            })
-            .catch(() => {
-            });
-
-        async function init() {
-            await Assets.load(ALL_ASSETS);
-            if (cancelled) return;
-
-            loadedRef.current = true;
-
-            const bgSprite = new Sprite(Texture.from('reel'));
-            bgSprite.width = width;
-            bgSprite.height = height;
-            app.stage.addChildAt(bgSprite, 0);
-
-            const reels: Reel[] = [];
-
-            for (let i = 0; i < REEL_COUNT; i++) {
-                const rc = new Container();
-                rc.x = i * cellW;
-                reelCont.addChild(rc);
-
-                const blur = new BlurFilter();
-                blur.blurX = 0;
-                blur.blurY = 0;
-                rc.filters = [blur];
-
-                // Mask clips each column to exactly cellW × (3 × cellH)
-                const mask = new Graphics();
-                mask.rect(0, 0, cellW, gridH).fill(0xffffff);
-                rc.addChild(mask);
-                rc.mask = mask;
-
-                const symbols: SlotSymbol[] = [];
-                for (let j = 0; j < REEL_SIZE; j++) {
-                    const sym = createSymbolSprite(randomAlias(), cellW, cellH);
-                    sym.container.y = j * cellH;
-                    rc.addChild(sym.container);
-                    symbols.push(sym);
-                }
-
-                reels.push({rc, symbols, position: 0, prevPos: 0, blur, stopping: false});
-            }
-
-            reelsRef.current = reels;
+        if (elapsed >= lineCycleMs) {
+          // Advance to next line
+          paylineCycleElapsedRef.current = 0;
+          paylineInDelayRef.current = false;
+          const nextIdx = (paylineCycleIdxRef.current + 1) % anims.length;
+          paylineCycleIdxRef.current = nextIdx;
+          activateWinLine(nextIdx);
+        } else if (elapsed >= lineShowMs && !paylineInDelayRef.current) {
+          // Enter blank-delay phase: hide everything until next advance
+          paylineInDelayRef.current = true;
+          deactivateCurrentLine();
         }
+      }
+    };
 
-        void init();
+    app.ticker.add(onTick);
 
-        // ── Win-line helpers (close over scene nodes and grid metrics) ────────────
+    return () => {
+      cancelled = true;
+      loadedRef.current = false;
+      spineReadyRef.current = false;
+      app.ticker.remove(onTick);
+      tweensRef.current = [];
+      reelsRef.current = [];
+      winOverlayRef.current = null;
+      paylineLayerRef.current = null;
+      activateWinLineRef.current = null;
+      for (const spine of activeWinSpinesRef.current) spine.destroy();
+      activeWinSpinesRef.current = [];
+      for (const a of paylineAnimsRef.current) a.destroy();
+      paylineAnimsRef.current = [];
+      winCellsByLineRef.current = [];
+      winOverlayCont.destroy({ children: true });
+      paylineLayer.destroy({ children: true });
+      reelCont.destroy({ children: true });
+      if (reelCont.parent) reelCont.parent.removeChild(reelCont);
+    };
+  }, [app]);
 
-        /** Destroy active win spines, restore hidden static sprites, clear payline. */
-        function deactivateCurrentLine() {
-            for (const spine of activeWinSpinesRef.current) {
-                if (spine.parent) spine.parent.removeChild(spine);
-                spine.destroy();
-            }
-            activeWinSpinesRef.current = [];
-            for (const reel of reelsRef.current) {
-                for (const sym of reel.symbols) sym.sprite.visible = true;
-            }
-            paylineLayerRef.current?.removeChildren();
-        }
-
-        /** Show payline N + create win spines for its cells; hides prior line first. */
-        function activateWinLine(idx: number) {
-            deactivateCurrentLine();
-
-            const anims = paylineAnimsRef.current;
-            const layer = paylineLayerRef.current;
-            const overlay = winOverlayRef.current;
-            if (!layer || !overlay || idx >= anims.length) return;
-
-            layer.addChild(anims[idx].container);
-
-            if (!spineReadyRef.current) return;
-
-            const newSpines: Spine[] = [];
-            for (const {col, row, symIdx} of winCellsByLineRef.current[idx] ?? []) {
-                const spine = createWinSpineForSymbol(symIdx, app.ticker);
-                if (!spine) continue;
-                const absX = gridX + col * cellW + cellW / 2;
-                const absY = gridY + row * cellH + cellH / 2;
-                layoutSpineInCell(spine, absX, absY, cellW, cellH);
-                overlay.addChild(spine);
-                newSpines.push(spine);
-                const staticSym = reelsRef.current[col]?.symbols[row + 1];
-                if (staticSym) staticSym.sprite.visible = false;
-            }
-            activeWinSpinesRef.current = newSpines;
-        }
-
-        activateWinLineRef.current = activateWinLine;
-
-        const ease = backout(0.4);
-
-        const onTick = () => {
-            if (!loadedRef.current) return;
-
-            const now = Date.now();
-            const reels = reelsRef.current;
-
-            // Fire stop tweens after minSpin ms
-            if (
-                spinRef.current &&
-                !stopFiredRef.current &&
-                reels.length > 0 &&
-                now - spinStartRef.current >= SPEED.minSpin
-            ) {
-                stopFiredRef.current = true;
-
-                reels.forEach((reel, i) => {
-                    reel.stopping = true;
-
-                    const extraCycles = 2 + i;
-                    const targetPos = (Math.ceil(reel.position / REEL_SIZE) + extraCycles) * REEL_SIZE;
-
-                    // Stamp server symbols onto the visible slots at rest position.
-                    // At position = any multiple of REEL_SIZE, visible symbols are indices 1, 2, 3.
-                    const col = targetMatrixRef.current?.[i];
-                    if (col) {
-                        [1, 2, 3].forEach((symIdx, rowIdx) => {
-                            const sym = reel.symbols[symIdx];
-                            if (sym && col[rowIdx] !== undefined) {
-                                updateSymbol(sym, SYMBOL_ALIASES[col[rowIdx] % SYMBOL_ALIASES.length], cellW, cellH);
-                            }
-                        });
-                    }
-
-                    tweensRef.current.push({
-                        reel,
-                        from: reel.position,
-                        to: targetPos,
-                        startMs: now,
-                        duration: SPEED.stopBase + i * SPEED.stopStep,
-                        ease,
-                        onDone: i === REEL_COUNT - 1 ? () => completeRef.current() : undefined,
-                    });
-                });
-            }
-
-            // Process active tweens
-            const done: Tween[] = [];
-            for (const tw of tweensRef.current) {
-                if (now < tw.startMs) continue;
-                const phase = Math.min(1, (now - tw.startMs) / tw.duration);
-                tw.reel.position = lerp(tw.from, tw.to, ease(phase));
-                if (phase >= 1) {
-                    tw.reel.position = tw.to;
-                    done.push(tw);
-                    tw.onDone?.();
-                }
-            }
-            if (done.length) tweensRef.current = tweensRef.current.filter((t) => !done.includes(t));
-
-            // Update every reel's symbol positions each frame
-            for (const reel of reels) {
-                if (spinRef.current && !reel.stopping) {
-                    reel.position += SPIN_SPEED / 60;
-                }
-
-                reel.blur.blurY = Math.abs(reel.position - reel.prevPos) * 8;
-                reel.prevPos = reel.position;
-
-                for (let j = 0; j < reel.symbols.length; j++) {
-                    const sym = reel.symbols[j];
-                    const prevY = sym.container.y;
-                    sym.container.y = ((reel.position + j) % REEL_SIZE) * cellH - cellH;
-
-                    // Swap symbol when it wraps off the top (only while freely spinning)
-                    if (sym.container.y < 0 && prevY > cellH && !reel.stopping) {
-                        updateSymbol(sym, randomAlias(), cellW, cellH);
-                    }
-                }
-            }
-
-            // ── Payline sequential animation ─────────────────────────────────────────
-            // Show duration = exact Spine loop length (no mid-cycle cut-off).
-            // Cycle = showMs + LINE_DELAY_MS blank pause.
-            const anims = paylineAnimsRef.current;
-            if (!spinRef.current && anims.length > 0) {
-                const lineShowMs = anims[paylineCycleIdxRef.current]?.durationMs ?? 1000;
-                const lineCycleMs = lineShowMs + LINE_DELAY_MS;
-
-                paylineCycleElapsedRef.current += app.ticker.deltaMS;
-                const elapsed = paylineCycleElapsedRef.current;
-
-                if (elapsed >= lineCycleMs) {
-                    // Advance to next line
-                    paylineCycleElapsedRef.current = 0;
-                    paylineInDelayRef.current = false;
-                    const nextIdx = (paylineCycleIdxRef.current + 1) % anims.length;
-                    paylineCycleIdxRef.current = nextIdx;
-                    activateWinLine(nextIdx);
-                } else if (elapsed >= lineShowMs && !paylineInDelayRef.current) {
-                    // Enter blank-delay phase: hide everything until next advance
-                    paylineInDelayRef.current = true;
-                    deactivateCurrentLine();
-                }
-            }
-        };
-
-        app.ticker.add(onTick);
-
-        return () => {
-            cancelled = true;
-            loadedRef.current = false;
-            spineReadyRef.current = false;
-            app.ticker.remove(onTick);
-            tweensRef.current = [];
-            reelsRef.current = [];
-            winOverlayRef.current = null;
-            paylineLayerRef.current = null;
-            activateWinLineRef.current = null;
-            for (const spine of activeWinSpinesRef.current) spine.destroy();
-            activeWinSpinesRef.current = [];
-            for (const a of paylineAnimsRef.current) a.destroy();
-            paylineAnimsRef.current = [];
-            winCellsByLineRef.current = [];
-            winOverlayCont.destroy({children: true});
-            paylineLayer.destroy({children: true});
-            reelCont.destroy({children: true});
-            if (reelCont.parent) reelCont.parent.removeChild(reelCont);
-        };
-    }, [app]);
-
-    return null;
+  return null;
 }
