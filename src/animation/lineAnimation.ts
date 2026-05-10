@@ -68,6 +68,9 @@ export interface GridMetrics {
 export interface PaylineAnimation {
     container: Container;
 
+    /** Duration of one full animation loop in milliseconds. */
+    durationMs: number;
+
     /** Called every frame — no-op here because Spine auto-ticks via the app ticker. */
     update(dt: number): void;
 
@@ -132,8 +135,14 @@ export function createPaylineAnimation(
 
     container.addChild(spine);
 
+    // Read the natural duration of the 'anim' track so callers can sync timers
+    // to exact loop boundaries and avoid visible mid-cycle cut-offs.
+    const animData = spine.skeleton.data.findAnimation('anim');
+    const durationMs = animData ? animData.duration * 1000 : 1000;
+
     return {
         container,
+        durationMs,
 
         // Spine auto-updates via the ticker passed to Spine.from — no manual work needed.
         update() {},
