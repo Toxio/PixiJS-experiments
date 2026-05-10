@@ -74,6 +74,13 @@ export interface PaylineAnimation {
     /** Called every frame — no-op here because Spine auto-ticks via the app ticker. */
     update(dt: number): void;
 
+    /**
+     * Restart the animation from time 0.
+     * Call this every time the line is made visible so it always plays from
+     * the beginning — even if the Spine kept ticking while off-screen.
+     */
+    restart(): void;
+
     destroy(): void;
 }
 
@@ -146,6 +153,19 @@ export function createPaylineAnimation(
 
         // Spine auto-updates via the ticker passed to Spine.from — no manual work needed.
         update() {},
+
+        restart() {
+            spine.state.setAnimation(0, 'anim', true);
+            // Re-apply bone offsets — setAnimation resets the skeleton to setup pose,
+            // which would undo the per-column row routing set up in the constructor.
+            for (let col = 0; col < 5; col++) {
+                const bone = spine.skeleton.findBone(COL_BONE_NAMES[col]);
+                if (!bone) continue;
+                const row = rows[col] ?? 1;
+                bone.y = ((1 - row) * cellH) / scale;
+            }
+            spine.update(0);
+        },
 
         destroy() {
             container.destroy({children: true});

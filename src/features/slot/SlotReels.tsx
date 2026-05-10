@@ -436,6 +436,9 @@ export function SlotReels({
       const overlay = winOverlayRef.current;
       if (!layer || !overlay || idx >= anims.length) return;
 
+      // Always restart from time 0 — the Spine keeps ticking while off-screen,
+      // so without this reset it would resume mid-loop and cause a visual jerk.
+      anims[idx].restart();
       layer.addChild(anims[idx].container);
 
       if (!spineReadyRef.current) return;
