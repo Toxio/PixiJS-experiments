@@ -17,8 +17,10 @@ export function SlotMachinePixi() {
     betAmount,
     setBetAmount,
     spinning,
+    matrix,
     targetMatrix,
     winAmount,
+    winLines,
     spin,
     handleSpinComplete,
   } = useSlotsHubSignalR({ spinSpeed: 2 });
@@ -36,6 +38,8 @@ export function SlotMachinePixi() {
           <SlotReels
             spinning={spinning}
             targetMatrix={targetMatrix}
+            matrix={matrix}
+            winLines={winLines}
             onSpinComplete={handleSpinComplete}
           />
         </Application>

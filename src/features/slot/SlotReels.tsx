@@ -6,10 +6,19 @@
  * REEL_GRID defines where the cell grid sits inside the image.
  */
 
+import { Spine } from '@esotericsoftware/spine-pixi-v8';
 import { useApplication } from '@pixi/react';
-import { Assets, BlurFilter, Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { Assets, BlurFilter, Container, Graphics, Sprite, Texture, type Ticker } from 'pixi.js';
 import { useEffect, useRef } from 'react';
 
+import { createGlassSpine, ensureGlassSpineLoaded } from '../../animation/glassSpine';
+import { createGobletSpine, ensureGobletSpineLoaded } from '../../animation/gobletSpine';
+import { createLipsSpine, ensureLipsSpineLoaded } from '../../animation/lipsSpine';
+import { createLipstickSpine, ensureLipstickSpineLoaded } from '../../animation/lipstickSpine';
+import { createParfumeSpine, ensureParfumeSpineLoaded } from '../../animation/parfumeSpine';
+import { createRoseSpine, ensureRoseSpineLoaded } from '../../animation/roseSpine';
+import { createSevenSpine, ensureSevenSpineLoaded } from '../../animation/sevenSpine';
+import { createStarSpine, ensureStarSpineLoaded } from '../../animation/starSpine';
 import reelImg from '../../assets/reel.png';
 import glassImg from '../../assets/symbols/images/glass.png';
 import gobletImg from '../../assets/symbols/images/goblet.png';
@@ -19,10 +28,9 @@ import parfumeImg from '../../assets/symbols/images/parfume.png';
 import roseImg from '../../assets/symbols/images/rose.png';
 import sevenImg from '../../assets/symbols/images/seven.png';
 import starImg from '../../assets/symbols/images/star.png';
+import type { WinLine } from '../../hooks/useSlotsHubSignalR';
 
 // ── Grid UV inset — pixel-precise from the pink divider lines in reel.png (1641×1022).
-// Vertical dividers at x ≈ 328/648/965/1282  → col width ≈ 311 px → grid x: 17..1596
-// Horizontal dividers at y ≈ 363/690          → row height ≈ 324 px → grid y: 39..1017
 const REEL_GRID = { x: 0.01, y: 0.038, w: 0.962, h: 0.957 } as const;
 
 const REEL_COUNT = 5;
@@ -34,6 +42,24 @@ const SPEED = {
   minSpin: 300,
   stopBase: 280,
   stopStep: 140,
+};
+
+/**
+ * Payline definitions — 1-indexed to match server line numbers.
+ * Each entry: [row at col0, row at col1, …, row at col4] (0=top, 1=middle, 2=bottom).
+ * Derived from observed win data: lines 1,3,5,7,8 all win with symbol=7 on
+ * matrix [[1,6,6],[3,6,9],[6,9,5],...] + expandingWild=[0,0,9,0,0].
+ */
+const PAYLINES: Readonly<Record<number, readonly number[]>> = {
+  1: [1, 1, 1, 1, 1], // straight centre
+  2: [0, 0, 0, 0, 0], // straight top
+  3: [2, 2, 2, 2, 2], // straight bottom
+  4: [0, 1, 2, 1, 0], // V-shape
+  5: [2, 1, 0, 1, 2], // inverted V
+  6: [0, 1, 0, 1, 0], // top zigzag
+  7: [2, 1, 2, 1, 2], // bottom zigzag
+  8: [1, 2, 1, 2, 1], // middle-bottom zigzag
+  9: [1, 0, 1, 0, 1], // middle-top zigzag
 };
 
 const ALL_ASSETS = [
@@ -61,6 +87,47 @@ function backout(amount: number) {
 
 function randomAlias() {
   return SYMBOL_ALIASES[Math.floor(Math.random() * SYMBOL_ALIASES.length)];
+}
+
+/** Create the win-animation Spine for a given symbol index (0–7). */
+function createWinSpineForSymbol(symIdx: number, ticker: Ticker): Spine | null {
+  switch (symIdx) {
+    case 0:
+      return createGlassSpine({ loop: true, animation: 'win', ticker });
+    case 1:
+      return createGobletSpine({ loop: true, ticker });
+    case 2:
+      return createLipsSpine({ loop: true, animation: 'win', ticker });
+    case 3:
+      return createLipstickSpine({ loop: true, ticker });
+    case 4:
+      return createParfumeSpine({ loop: true, ticker });
+    case 5:
+      return createRoseSpine({ loop: true, ticker });
+    case 6:
+      return createSevenSpine({ loop: true, ticker });
+    case 7:
+      return createStarSpine({ loop: true, animation: 'win', ticker });
+    default:
+      return null;
+  }
+}
+
+/** Scale and centre a Spine so it fills one reel cell. */
+function layoutSpineInCell(
+  spine: Spine,
+  absX: number,
+  absY: number,
+  cellW: number,
+  cellH: number,
+): void {
+  spine.update(0);
+  const lb = spine.getLocalBounds();
+  const bw = lb.width > 0 ? lb.width : 1;
+  const bh = lb.height > 0 ? lb.height : 1;
+  const s = Math.min(cellW / bw, cellH / bh);
+  spine.scale.set(s);
+  spine.position.set(absX - (lb.x + lb.width / 2) * s, absY - (lb.y + lb.height / 2) * s);
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────
@@ -115,10 +182,13 @@ function updateSymbol(sym: SlotSymbol, alias: string, cw: number, ch: number): v
 export interface SlotReelsProps {
   spinning: boolean;
   targetMatrix: number[][] | null;
+  /** Settled matrix (5 reels × 3 rows) used to locate winning cells. */
+  matrix: number[][];
+  winLines: WinLine[];
   onSpinComplete: () => void;
 }
 
-export function SlotReels({ spinning, targetMatrix, onSpinComplete }: SlotReelsProps) {
+export function SlotReels({ spinning, targetMatrix, matrix, onSpinComplete, winLines }: SlotReelsProps) {
   const { app } = useApplication();
 
   const spinRef = useRef(spinning);
@@ -129,6 +199,9 @@ export function SlotReels({ spinning, targetMatrix, onSpinComplete }: SlotReelsP
   const stopFiredRef = useRef(false);
   const loadedRef = useRef(false);
   const targetMatrixRef = useRef<number[][] | null>(null);
+
+  const winOverlayRef = useRef<Container | null>(null);
+  const spineReadyRef = useRef(false);
 
   useEffect(() => {
     spinRef.current = spinning;
@@ -142,7 +215,7 @@ export function SlotReels({ spinning, targetMatrix, onSpinComplete }: SlotReelsP
     targetMatrixRef.current = targetMatrix;
   }, [targetMatrix]);
 
-  // Reset per-spin state when a new spin begins
+  // Clear win overlay and reset per-spin state when a new spin begins
   useEffect(() => {
     if (!spinning) return;
     spinStartRef.current = Date.now();
@@ -151,7 +224,64 @@ export function SlotReels({ spinning, targetMatrix, onSpinComplete }: SlotReelsP
     reelsRef.current.forEach((r) => {
       r.stopping = false;
     });
+    winOverlayRef.current?.removeChildren();
   }, [spinning]);
+
+  // Show win animations once reels have stopped.
+  // PAYLINES determines the exact row for each column; the server win data
+  // (winLines) tells us which symbol to animate.  For lines not in PAYLINES we
+  // fall back to scanning the matrix for the matching symbol.
+  useEffect(() => {
+    if (spinning || !winLines.length || !spineReadyRef.current) return;
+    const overlay = winOverlayRef.current;
+    if (!overlay) return;
+
+    overlay.removeChildren();
+
+    const { width, height } = app.screen;
+    const gridX = Math.round(width * REEL_GRID.x);
+    const gridY = Math.round(height * REEL_GRID.y);
+    const gridW = Math.round(width * REEL_GRID.w);
+    const gridH = Math.round(height * REEL_GRID.h);
+    const cellW = gridW / REEL_COUNT;
+    const cellH = gridH / VISIBLE_ROWS;
+
+    // key = "col,row"  value = symIdx  — deduplicated across multiple win lines
+    const cells = new Map<string, number>();
+
+    for (const win of winLines) {
+      const symIdx = win.symbol % SYMBOL_ALIASES.length;
+      const payline = PAYLINES[win.line];
+
+      for (let col = 0; col < win.count && col < REEL_COUNT; col++) {
+        let row: number;
+
+        if (payline) {
+          // Payline defines the exact row for this column on this line
+          row = payline[col] ?? 1;
+        } else {
+          // Unknown payline — find the first cell in this column that shows the
+          // winning symbol (wild substitution already accounted for server-side)
+          const reelCol = matrix[col];
+          row = reelCol?.findIndex((s) => s % SYMBOL_ALIASES.length === symIdx) ?? -1;
+          if (row < 0) continue;
+        }
+
+        cells.set(`${col},${row}`, symIdx);
+      }
+    }
+
+    for (const [key, symIdx] of cells) {
+      const [col, row] = key.split(',').map(Number);
+      const spine = createWinSpineForSymbol(symIdx, app.ticker);
+      if (!spine) continue;
+
+      const absX = gridX + col * cellW + cellW / 2;
+      const absY = gridY + row * cellH + cellH / 2;
+      layoutSpineInCell(spine, absX, absY, cellW, cellH);
+      overlay.addChild(spine);
+    }
+  }, [spinning, winLines, matrix, app]);
 
   // One-time scene setup
   useEffect(() => {
@@ -169,7 +299,28 @@ export function SlotReels({ spinning, targetMatrix, onSpinComplete }: SlotReelsP
     reelCont.y = gridY;
     app.stage.addChild(reelCont);
 
+    // Win overlay sits above the reels so spine animations are not clipped by reel masks
+    const winOverlayCont = new Container();
+    app.stage.addChild(winOverlayCont);
+    winOverlayRef.current = winOverlayCont;
+
     let cancelled = false;
+
+    // Preload all spine assets in parallel with PNG assets
+    Promise.all([
+      ensureGlassSpineLoaded(),
+      ensureGobletSpineLoaded(),
+      ensureLipsSpineLoaded(),
+      ensureLipstickSpineLoaded(),
+      ensureParfumeSpineLoaded(),
+      ensureRoseSpineLoaded(),
+      ensureSevenSpineLoaded(),
+      ensureStarSpineLoaded(),
+    ])
+      .then(() => {
+        if (!cancelled) spineReadyRef.current = true;
+      })
+      .catch(() => {});
 
     async function init() {
       await Assets.load(ALL_ASSETS);
@@ -304,9 +455,12 @@ export function SlotReels({ spinning, targetMatrix, onSpinComplete }: SlotReelsP
     return () => {
       cancelled = true;
       loadedRef.current = false;
+      spineReadyRef.current = false;
       app.ticker.remove(onTick);
       tweensRef.current = [];
       reelsRef.current = [];
+      winOverlayRef.current = null;
+      winOverlayCont.destroy({ children: true });
       reelCont.destroy({ children: true });
       if (reelCont.parent) reelCont.parent.removeChild(reelCont);
     };
