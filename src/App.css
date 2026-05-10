@@ -228,4 +228,38 @@
     cursor: not-allowed;
 }
 
+/* ── Buy Bonus button ────────────────────────────────────────────────────── */
+.smp-buy-bonus-btn {
+    padding: 12px 32px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #fff;
+    background: linear-gradient(135deg, #8b005d 0%, #d4007a 50%, #8b005d 100%);
+    border: 2px solid rgba(255, 100, 200, 0.5);
+    border-radius: 40px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(212, 0, 122, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: transform 0.1s ease,
+    box-shadow 0.1s ease,
+    opacity 0.15s ease;
+}
+
+.smp-buy-bonus-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(212, 0, 122, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.smp-buy-bonus-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.smp-buy-bonus-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 /* ── End SlotMachinePixi ──────────────────────────────────────────────────── */

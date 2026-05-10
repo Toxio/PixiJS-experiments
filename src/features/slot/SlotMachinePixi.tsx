@@ -1,13 +1,15 @@
 import { Application } from '@pixi/react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { useSlotsHubSignalR } from '../../hooks/useSlotsHubSignalR';
 import { SlotBetRow } from './SlotBetRow';
 import { BalanceRow } from './BalanceRow';
 import { SlotReels } from './SlotReels';
+import { BuyBonusModal } from '../buyBonus/BuyBonusModal';
 
 export function SlotMachinePixi() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [buyBonusOpen, setBuyBonusOpen] = useState(false);
 
   const {
     status,
@@ -53,21 +55,45 @@ export function SlotMachinePixi() {
           onBetChange={setBetAmount}
         />
 
-        <button
-          className="smp-spin-btn"
-          type="button"
-          onClick={spin}
-          disabled={spinning || status !== 'ready'}
-        >
-          {status === 'connecting'
-            ? 'Connecting…'
-            : status === 'error'
-              ? 'Error'
-              : spinning
-                ? 'Spinning…'
-                : 'SPIN'}
-        </button>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <button
+            className="smp-buy-bonus-btn"
+            type="button"
+            onClick={() => setBuyBonusOpen(true)}
+            disabled={spinning || status !== 'ready'}
+          >
+            Buy Bonus
+          </button>
+
+          <button
+            className="smp-spin-btn"
+            type="button"
+            onClick={spin}
+            disabled={spinning || status !== 'ready'}
+          >
+            {status === 'connecting'
+              ? 'Connecting…'
+              : status === 'error'
+                ? 'Error'
+                : spinning
+                  ? 'Spinning…'
+                  : 'SPIN'}
+          </button>
+        </div>
       </div>
+
+      {buyBonusOpen && (
+        <BuyBonusModal
+          onClose={() => setBuyBonusOpen(false)}
+          onBuy={(optionId, bet) => {
+            console.log('Buy bonus', { optionId, bet });
+            setBuyBonusOpen(false);
+          }}
+          currency={currency}
+          quickBets={quickBets}
+          defaultBet={betAmount}
+        />
+      )}
     </div>
   );
 }
