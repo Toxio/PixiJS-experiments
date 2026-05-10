@@ -108,7 +108,9 @@ function createWinSpineForSymbol(symIdx: number, ticker: Ticker): Spine | null {
   }
 }
 
-/** Scale and centre a Spine so it fills one reel cell. */
+const SPINE_CELL_SCALE = 0.82;
+
+/** Scale and centre a Spine so it fits inside one reel cell (same padding as static sprites). */
 function layoutSpineInCell(
   spine: Spine,
   absX: number,
@@ -120,7 +122,7 @@ function layoutSpineInCell(
   const lb = spine.getLocalBounds();
   const bw = lb.width > 0 ? lb.width : 1;
   const bh = lb.height > 0 ? lb.height : 1;
-  const s = Math.min(cellW / bw, cellH / bh);
+  const s = Math.min((cellW * SPINE_CELL_SCALE) / bw, (cellH * SPINE_CELL_SCALE) / bh);
   spine.scale.set(s);
   spine.position.set(absX - (lb.x + lb.width / 2) * s, absY - (lb.y + lb.height / 2) * s);
 }
@@ -198,14 +200,10 @@ export function SlotReels({ spinning, targetMatrix, matrix, onSpinComplete, winL
   const winOverlayRef = useRef<Container | null>(null);
   const spineReadyRef = useRef(false);
 
-  // Payline cycling state
   const paylineLayerRef = useRef<Container | null>(null);
-  const paylineCycleRef = useRef<{
-    animations: PaylineAnimation[];
-    currentIdx: number;
-    cycleElapsed: number;
-    frameElapsed: number;
-  } | null>(null);
+  const paylineAnimsRef = useRef<PaylineAnimation[]>([]);
+  const paylineCycleIdxRef = useRef(0);
+  const paylineCycleElapsedRef = useRef(0);
 
   useEffect(() => {
     spinRef.current = spinning;
@@ -227,13 +225,14 @@ export function SlotReels({ spinning, targetMatrix, matrix, onSpinComplete, winL
     tweensRef.current = [];
     reelsRef.current.forEach((r) => {
       r.stopping = false;
+      // Restore any static sprites that were hidden during win animation
+      r.symbols.forEach((sym) => {
+        sym.sprite.visible = true;
+      });
     });
     winOverlayRef.current?.removeChildren();
-    // Tear down any active payline animations
-    if (paylineCycleRef.current) {
-      for (const anim of paylineCycleRef.current.animations) anim.destroy();
-      paylineCycleRef.current = null;
-    }
+    for (const anim of paylineAnimsRef.current) anim.destroy();
+    paylineAnimsRef.current = [];
     paylineLayerRef.current?.removeChildren();
   }, [spinning]);
 
@@ -293,20 +292,26 @@ export function SlotReels({ spinning, targetMatrix, matrix, onSpinComplete, winL
       const absY = gridY + row * cellH + cellH / 2;
       layoutSpineInCell(spine, absX, absY, cellW, cellH);
       overlay.addChild(spine);
+
+      // Hide the static sprite so only the win animation is visible
+      const staticSym = reelsRef.current[col]?.symbols[row + 1];
+      // eslint-disable-next-line react-hooks/immutability
+      if (staticSym) staticSym.sprite.visible = false;
     }
   }, [spinning, winLines, matrix, app]);
 
-  // Build payline cycling animations whenever a new set of win lines arrives.
+  // Build payline animations whenever a new set of win lines arrives.
+  // All animations are pre-created but only the current one is shown at a time.
   useEffect(() => {
     if (spinning || !winLines.length) return;
     const layer = paylineLayerRef.current;
     if (!layer) return;
 
     layer.removeChildren();
-    if (paylineCycleRef.current) {
-      for (const a of paylineCycleRef.current.animations) a.destroy();
-      paylineCycleRef.current = null;
-    }
+    for (const a of paylineAnimsRef.current) a.destroy();
+    paylineAnimsRef.current = [];
+    paylineCycleIdxRef.current = 0;
+    paylineCycleElapsedRef.current = 0;
 
     const { width, height } = app.screen;
     const gridX = Math.round(width * REEL_GRID.x);
@@ -318,28 +323,19 @@ export function SlotReels({ spinning, targetMatrix, matrix, onSpinComplete, winL
       gridY,
       cellW: gridW / REEL_COUNT,
       cellH: gridH / VISIBLE_ROWS,
+      ticker: app.ticker,
     };
-
-    const animations: PaylineAnimation[] = [];
 
     for (const win of winLines) {
       const rows = getPaylineForLineId(win.line);
       if (!rows) continue;
       const anim = createPaylineAnimation(win.line, rows, metrics, win.count);
-      animations.push(anim);
+      paylineAnimsRef.current.push(anim);
     }
 
-    if (!animations.length) return;
-
-    // Show only the first line initially; ticker handles cycling.
-    layer.addChild(animations[0].container);
-
-    paylineCycleRef.current = {
-      animations,
-      currentIdx: 0,
-      cycleElapsed: 0,
-      frameElapsed: 0,
-    };
+    if (paylineAnimsRef.current.length > 0) {
+      layer.addChild(paylineAnimsRef.current[0].container);
+    }
   }, [spinning, winLines, app]);
 
   // One-time scene setup
@@ -514,31 +510,22 @@ export function SlotReels({ spinning, targetMatrix, matrix, onSpinComplete, winL
         }
       }
 
-      // ── Payline cycling animation ────────────────────────────────────────────
-      const cycle = paylineCycleRef.current;
+      // ── Payline sequential animation ─────────────────────────────────────────
+      const anims = paylineAnimsRef.current;
       const layer = paylineLayerRef.current;
-      if (!spinRef.current && cycle && layer && cycle.animations.length > 0) {
-        const dt = app.ticker.deltaMS;
-        cycle.frameElapsed += dt;
-        cycle.cycleElapsed += dt;
+      if (!spinRef.current && anims.length > 0 && layer) {
+        const CYCLE_DURATION = 1400; // ms each line is shown before advancing
+        paylineCycleElapsedRef.current += app.ticker.deltaMS;
 
-        const CYCLE_DURATION = 1600; // ms per line
+        if (paylineCycleElapsedRef.current >= CYCLE_DURATION) {
+          paylineCycleElapsedRef.current = 0;
 
-        // Advance to the next line when the current one has been shown long enough
-        if (cycle.cycleElapsed >= CYCLE_DURATION) {
-          cycle.cycleElapsed = 0;
-          cycle.frameElapsed = 0;
+          // Advance to next line (wrap around to 0 after the last)
+          const nextIdx = (paylineCycleIdxRef.current + 1) % anims.length;
+          paylineCycleIdxRef.current = nextIdx;
 
-          const nextIdx = (cycle.currentIdx + 1) % cycle.animations.length;
           layer.removeChildren();
-          layer.addChild(cycle.animations[nextIdx].container);
-          cycle.currentIdx = nextIdx;
-        }
-
-        // Drive the per-frame animation for the currently visible line
-        const current = cycle.animations[cycle.currentIdx];
-        if (current) {
-          current.update(dt);
+          layer.addChild(anims[nextIdx].container);
         }
       }
     };
@@ -554,10 +541,8 @@ export function SlotReels({ spinning, targetMatrix, matrix, onSpinComplete, winL
       reelsRef.current = [];
       winOverlayRef.current = null;
       paylineLayerRef.current = null;
-      if (paylineCycleRef.current) {
-        for (const a of paylineCycleRef.current.animations) a.destroy();
-        paylineCycleRef.current = null;
-      }
+      for (const a of paylineAnimsRef.current) a.destroy();
+      paylineAnimsRef.current = [];
       winOverlayCont.destroy({ children: true });
       paylineLayer.destroy({ children: true });
       reelCont.destroy({ children: true });

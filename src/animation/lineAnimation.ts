@@ -1,223 +1,145 @@
 /**
- * Payline win-line overlay animations.
+ * Payline win-line overlay animations driven by the Spine skeleton in
+ * src/assets/line/ (line.json + line.atlas.txt + line.png).
  *
- * Always renders the full 5-column payline path so the player can see the line
- * shape. The winning portion (first `count` columns) is bright and animated;
- * the remaining columns are drawn dimmed for context.
- *
- * Assets used from src/assets/line/images/:
- *   lines_animation.png  — 1500×150 px strip (10 × 150 px frames); tiled as a
- *                          scrolling light texture along winning segments.
- *   goldenleaveA.png     — rotating decoration placed on winning cell centres.
+ * The skeleton contains 5 IK-target column bones (bone1–bone5).  By setting
+ * each bone's Y in Spine coordinate space (Y-up) we route the animated line
+ * through any payline shape before the animation loop starts.  The "anim"
+ * timeline only drives the leaf sprites and the scrolling light mesh — the
+ * column bones are NOT keyframed, so our offsets persist throughout playback.
  */
 
-import { Assets, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js';
+import {SetupPoseBoundsProvider, Spine} from '@esotericsoftware/spine-pixi-v8';
+import {Assets, Container, type Ticker} from 'pixi.js';
 
-import goldenLeaveUrl from '../assets/line/images/goldenleaveA.png';
-import linesAnimationUrl from '../assets/line/images/lines_animation.png';
+import lineAtlasUrl from '../assets/line/line.atlas.txt?url';
+import lineJsonUrl from '../assets/line/line.json?url';
+import linePngUrl from '../assets/line/line.png?url';
 
-// ── Payline colours (1-indexed to match server line numbers) ─────────────────
-export const PAYLINE_COLORS: Record<number, number> = {
-  1: 0xffd700, // gold
-  2: 0xff4444, // red
-  3: 0x44aaff, // blue
-  4: 0xff44ff, // magenta
-  5: 0x44ff88, // green
-  6: 0xff8844, // orange
-  7: 0x44ffff, // cyan
-  8: 0xff44aa, // pink
-  9: 0xaaff44, // lime
-  10: 0xaa44ff, // purple
-};
+// ── Asset aliases ──────────────────────────────────────────────────────────────
+const LINE_SKEL_ALIAS = 'lineSpineSkel';
+const LINE_ATLAS_ALIAS = 'lineSpineAtlas';
 
-// ── Asset loading ─────────────────────────────────────────────────────────────
+// ── Spine-space column bone data ───────────────────────────────────────────────
+// X positions of the 5 column IK-target bones in the setup pose (Spine units).
+const BONE1_X = -123.08;
+const BONE5_X = 1159.37;
+// Total span between first and last column bone.
+const SPINE_COL_SPAN = BONE5_X - BONE1_X; // ≈ 1282.45 Spine units
+
+const COL_BONE_NAMES = ['bone1', 'bone2', 'bone3', 'bone4', 'bone5'] as const;
+
+// ── Asset registration ─────────────────────────────────────────────────────────
+let registered = false;
+
+function registerLineSpineAssets(): void {
+    if (registered) return;
+    Assets.add({alias: LINE_SKEL_ALIAS, src: lineJsonUrl});
+    // The atlas file ends in .atlas.txt, not .atlas, so we explicitly tell the
+    // PixiJS asset system to use the Spine atlas parser via loadParser.
+    Assets.add({
+        alias: LINE_ATLAS_ALIAS,
+        src: lineAtlasUrl,
+        loadParser: 'spineTextureAtlasLoader',
+        data: {images: {'line.png': linePngUrl}},
+    });
+    registered = true;
+}
+
 let loadPromise: Promise<void> | null = null;
 
 export function ensureLineAssetsLoaded(): Promise<void> {
-  if (!loadPromise) {
-    loadPromise = Assets.load([
-      { alias: 'linesAnimation', src: linesAnimationUrl },
-      { alias: 'goldenLeave', src: goldenLeaveUrl },
-    ]).then(() => undefined);
-  }
-  return loadPromise;
+    registerLineSpineAssets();
+    if (!loadPromise) {
+        loadPromise = Assets.load([LINE_SKEL_ALIAS, LINE_ATLAS_ALIAS]).then(() => undefined);
+    }
+    return loadPromise;
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Public types ───────────────────────────────────────────────────────────────
 export interface GridMetrics {
-  gridX: number;
-  gridY: number;
-  cellW: number;
-  cellH: number;
+    gridX: number;
+    gridY: number;
+    cellW: number;
+    cellH: number;
+    ticker: Ticker;
 }
 
 export interface PaylineAnimation {
-  container: Container;
-  /** Call every frame with the deltaMS for this tick. */
-  update(dt: number): void;
-  destroy(): void;
+    container: Container;
+
+    /** Called every frame — no-op here because Spine auto-ticks via the app ticker. */
+    update(dt: number): void;
+
+    destroy(): void;
 }
 
-// ── Factory ───────────────────────────────────────────────────────────────────
+// ── Factory ────────────────────────────────────────────────────────────────────
 /**
- * Creates an animated payline overlay for one winning line.
+ * Creates a looping Spine payline animation for one winning line.
  *
- * @param lineId  Server line number (1–10).
- * @param rows    All five row-indices for this payline (0=top, 1=mid, 2=bot).
- * @param metrics Cell grid geometry in canvas pixels.
- * @param count   How many columns the win spans (remaining columns are dimmed).
+ * @param _lineId  Server line number (unused — all lines share one skeleton).
+ * @param rows     Row index (0=top, 1=mid, 2=bot) per column (5 values).
+ * @param metrics  Cell grid geometry + app ticker.
  */
 export function createPaylineAnimation(
-  lineId: number,
-  rows: number[],
-  metrics: GridMetrics,
-  count: number,
+    _lineId: number,
+    rows: number[],
+    metrics: GridMetrics,
 ): PaylineAnimation {
-  const { gridX, gridY, cellW, cellH } = metrics;
-  const color = PAYLINE_COLORS[lineId] ?? 0xffffff;
-  const winCount = Math.max(1, Math.min(count, 5));
+    const {gridX, gridY, cellW, cellH, ticker} = metrics;
 
-  const container = new Container();
+    const container = new Container();
 
-  // Build all 5 cell-centre points (full payline path)
-  const allPts = rows.slice(0, 5).map((row, col) => ({
-    x: gridX + col * cellW + cellW / 2,
-    y: gridY + row * cellH + cellH / 2,
-    winning: col < winCount,
-  }));
+    const spine = Spine.from({
+        skeleton: LINE_SKEL_ALIAS,
+        atlas: LINE_ATLAS_ALIAS,
+        boundsProvider: new SetupPoseBoundsProvider(),
+        ticker,
+    });
 
-  const winPts = allPts.filter((p) => p.winning);
-  const dimPts = allPts.filter((p) => !p.winning);
+    // show it in loop
+    spine.state.setAnimation(0, 'anim', true);
 
-  // ── Dim connector: full 5-point path at low opacity ──────────────────────
-  const dimLine = new Graphics();
-  drawPolyline(dimLine, allPts, 3, color, 0.25);
-  container.addChild(dimLine);
+    // Scale: map the bone1→bone5 span to 4 × cellW screen pixels (column 0–4).
+    const scale = (4 * cellW) / SPINE_COL_SPAN;
+    spine.scale.set(scale);
 
-  // ── Winning glow (wide, translucent) ─────────────────────────────────────
-  const glow = new Graphics();
-  drawPolyline(glow, winPts, 18, color, 0.22);
-  container.addChild(glow);
+    // X: shift so that bone1 (column 0 IK target) sits at the column-0 centre.
+    //    bone1.worldX in screen space = spine.x + BONE1_X * scale
+    //    We want that to equal gridX + cellW / 2.
+    spine.x = gridX + cellW / 2 - BONE1_X * scale;
 
-  // ── Winning main line ─────────────────────────────────────────────────────
-  const mainLine = new Graphics();
-  drawPolyline(mainLine, winPts, 5, color, 1);
-  container.addChild(mainLine);
+    // Y: place Spine Y=0 at the centre of the middle row (row 1).
+    //    spine-pixi-v8 renders with Spine's Y-up convention, so positive bone Y
+    //    goes UP on screen (= smaller screen Y).
+    spine.y = gridY + cellH * 1.5;
 
-  // ── Scrolling light texture along each winning segment ────────────────────
-  const tilingSprites: TilingSprite[] = [];
-  let linesTex: Texture | null = null;
-  try {
-    linesTex = Texture.from('linesAnimation');
-  } catch {
-    // texture not yet loaded — skip tiling effect
-  }
-
-  if (linesTex) {
-    const TILE_H = linesTex.height; // 150 px
-
-    for (let i = 1; i < winPts.length; i++) {
-      const a = winPts[i - 1];
-      const b = winPts[i];
-      const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-      const angle = Math.atan2(b.y - a.y, b.x - a.x);
-
-      const ts = new TilingSprite({ texture: linesTex, width: segLen, height: TILE_H });
-      ts.tileScale.set(TILE_H / linesTex.height);
-      ts.anchor.set(0, 0.5);
-      ts.position.set(a.x, a.y);
-      ts.rotation = angle;
-      ts.alpha = 0.35;
-      ts.blendMode = 'add';
-      container.addChild(ts);
-      tilingSprites.push(ts);
+    // Route each column bone through its payline row.
+    // bone.y = (1 - row) * cellH / scale
+    //   row 0 (top)  → +cellH/scale  (positive Spine Y = up = smaller screen Y) ✓
+    //   row 1 (mid)  → 0             (spine Y=0 is already at middle row)       ✓
+    //   row 2 (bot)  → −cellH/scale  (negative Spine Y = down = larger screen Y) ✓
+    for (let col = 0; col < 5; col++) {
+        const bone = spine.skeleton.findBone(COL_BONE_NAMES[col]);
+        if (!bone) continue;
+        const row = rows[col] ?? 1;
+        bone.y = ((1 - row) * cellH) / scale;
     }
-  }
 
-  // ── Winning cell decorations: bright dot + rotating golden leaf ───────────
-  const leaves: Sprite[] = [];
-  let leafTex: Texture | null = null;
-  try {
-    leafTex = Texture.from('goldenLeave');
-  } catch {
-    // skip
-  }
+    // Apply bone offsets before the first rendered frame.
+    spine.update(0);
 
-  for (const p of winPts) {
-    const dot = new Graphics();
-    dot.circle(0, 0, 10).fill({ color: 0xffffff, alpha: 0.9 });
-    dot.circle(0, 0, 7).fill({ color, alpha: 1 });
-    dot.position.set(p.x, p.y);
-    container.addChild(dot);
+    container.addChild(spine);
 
-    if (leafTex) {
-      const leaf = new Sprite(leafTex);
-      leaf.anchor.set(0.5);
-      leaf.position.set(p.x, p.y);
-      leaf.scale.set(0.36);
-      leaf.alpha = 0.9;
-      container.addChild(leaf);
-      leaves.push(leaf);
-    }
-  }
+    return {
+        container,
 
-  // ── Dimmed dots on non-winning cells ─────────────────────────────────────
-  for (const p of dimPts) {
-    const dot = new Graphics();
-    dot.circle(0, 0, 6).fill({ color, alpha: 0.3 });
-    dot.position.set(p.x, p.y);
-    container.addChild(dot);
-  }
+        // Spine auto-updates via the ticker passed to Spine.from — no manual work needed.
+        update() {},
 
-  // ── Line-number badge (left of first cell) ────────────────────────────────
-  const badge = new Graphics();
-  badge.circle(0, 0, 13).fill({ color, alpha: 0.9 });
-  badge.position.set(gridX - 20, allPts[0]?.y ?? 0);
-  container.addChild(badge);
-
-  // ── Animation state ───────────────────────────────────────────────────────
-  let elapsed = 0;
-
-  return {
-    container,
-
-    update(dt: number) {
-      elapsed += dt;
-      const pulse = 0.5 + 0.5 * Math.sin(elapsed / 250);
-
-      glow.alpha = pulse * 0.45;
-      mainLine.alpha = 0.65 + 0.35 * pulse;
-      badge.alpha = 0.7 + 0.3 * pulse;
-
-      for (const ts of tilingSprites) {
-        ts.tilePosition.x -= 2;
-        ts.alpha = 0.25 + 0.2 * pulse;
-      }
-
-      for (const leaf of leaves) {
-        leaf.rotation += 0.03;
-        leaf.alpha = 0.7 + 0.3 * pulse;
-      }
-    },
-
-    destroy() {
-      container.destroy({ children: true });
-    },
-  };
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function drawPolyline(
-  g: Graphics,
-  pts: { x: number; y: number }[],
-  width: number,
-  color: number,
-  alpha: number,
-): void {
-  if (pts.length < 2) return;
-  g.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < pts.length; i++) {
-    g.lineTo(pts[i].x, pts[i].y);
-  }
-  g.stroke({ width, color, alpha, cap: 'round', join: 'round' });
+        destroy() {
+            container.destroy({children: true});
+        },
+    };
 }

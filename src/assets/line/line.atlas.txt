@@ -1,0 +1,12 @@
+line.png
+size:1697,154
+filter:Linear,Linear
+pma:true
+goldenleaveA
+bounds:1604,61,91,91
+offsets:6,6,103,103
+greenleaveA
+bounds:1504,54,98,98
+offsets:6,7,109,109
+lines_animation
+bounds:2,2,1500,150
