@@ -29,6 +29,7 @@ import roseImg from '../../assets/symbols/images/rose.png';
 import sevenImg from '../../assets/symbols/images/seven.png';
 import starImg from '../../assets/symbols/images/star.png';
 import type { WinLine } from '../../hooks/useSlotsHubSignalR';
+import { getPaylineForLineId } from '../../old/slot/paylines';
 
 // ── Grid UV inset — pixel-precise from the pink divider lines in reel.png (1641×1022).
 const REEL_GRID = { x: 0.01, y: 0.038, w: 0.962, h: 0.957 } as const;
@@ -50,17 +51,6 @@ const SPEED = {
  * Derived from observed win data: lines 1,3,5,7,8 all win with symbol=7 on
  * matrix [[1,6,6],[3,6,9],[6,9,5],...] + expandingWild=[0,0,9,0,0].
  */
-const PAYLINES: Readonly<Record<number, readonly number[]>> = {
-  1: [1, 1, 1, 1, 1], // straight centre
-  2: [0, 0, 0, 0, 0], // straight top
-  3: [2, 2, 2, 2, 2], // straight bottom
-  4: [0, 1, 2, 1, 0], // V-shape
-  5: [2, 1, 0, 1, 2], // inverted V
-  6: [0, 1, 0, 1, 0], // top zigzag
-  7: [2, 1, 2, 1, 2], // bottom zigzag
-  8: [1, 2, 1, 2, 1], // middle-bottom zigzag
-  9: [1, 0, 1, 0, 1], // middle-top zigzag
-};
 
 const ALL_ASSETS = [
   { alias: 'reel', src: reelImg },
@@ -251,18 +241,21 @@ export function SlotReels({ spinning, targetMatrix, matrix, onSpinComplete, winL
 
     for (const win of winLines) {
       const symIdx = win.symbol % SYMBOL_ALIASES.length;
-      const payline = PAYLINES[win.line];
+      const payline = getPaylineForLineId(win.line);
 
       for (let col = 0; col < win.count && col < REEL_COUNT; col++) {
+        const reelCol = matrix[col];
         let row: number;
 
         if (payline) {
           // Payline defines the exact row for this column on this line
           row = payline[col] ?? 1;
+          // Only animate if the settled matrix actually shows the winning symbol
+          // at this cell.  Wild-substituted cells are skipped — the substitution
+          // happens server-side but visually the cell shows a different symbol.
+          if ((reelCol?.[row] ?? -1) % SYMBOL_ALIASES.length !== symIdx) continue;
         } else {
-          // Unknown payline — find the first cell in this column that shows the
-          // winning symbol (wild substitution already accounted for server-side)
-          const reelCol = matrix[col];
+          // Unknown payline — find the cell in this column that shows the symbol
           row = reelCol?.findIndex((s) => s % SYMBOL_ALIASES.length === symIdx) ?? -1;
           if (row < 0) continue;
         }
