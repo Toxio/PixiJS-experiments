@@ -1,10 +1,12 @@
 import './App.css';
-import {Main} from './components/Main';
+import {SlotMachinePixi} from "./features/slot/SlotMachinePixi.tsx";
 
 function App() {
     return (
         <div className="app-page">
-            <Main/>
+            <main className="main-screen">
+                <SlotMachinePixi/>
+            </main>
         </div>
     );
 }

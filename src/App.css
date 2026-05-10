@@ -18,10 +18,72 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 24px;
+    gap: 20px;
 }
 
+/* ── HUD (balance / win) ─────────────────────────────────────────────────── */
+.smp-hud {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.smp-hud-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 20px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 165, 0, 0.25);
+    border-radius: 14px;
+    backdrop-filter: blur(6px);
+    min-width: 110px;
+}
+
+.smp-hud-tile--win {
+    border-color: rgba(255, 215, 0, 0.5);
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.25);
+    animation: smp-win-pulse 0.6s ease-out;
+}
+
+@keyframes smp-win-pulse {
+    0% {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.06);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.smp-hud-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 200, 100, 0.7);
+}
+
+.smp-hud-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.04em;
+}
+
+.smp-hud-value--win {
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
+}
+
+/* ── Canvas ──────────────────────────────────────────────────────────────── */
 .smp-canvas {
+    position: relative;
     width: min(980px, 77vw);
     aspect-ratio: 1641 / 1022;
     border-radius: 32px;
@@ -30,6 +92,113 @@
     0 0 80px rgba(255, 100, 0, 0.1);
 }
 
+/* ── Overlay (connecting / error) ────────────────────────────────────────── */
+.smp-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    border-radius: 32px;
+}
+
+.smp-overlay--error {
+    color: #ff6b6b;
+}
+
+/* ── Controls (bet row + spin) ───────────────────────────────────────────── */
+.smp-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+.smp-bet-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.smp-bet-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 200, 100, 0.7);
+    margin-right: 4px;
+}
+
+.smp-bet-arrow {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid rgba(245, 166, 35, 0.35);
+    background: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 200, 100, 0.85);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.1s ease;
+    flex-shrink: 0;
+}
+
+.smp-bet-arrow:hover:not(:disabled) {
+    border-color: #f5a623;
+    background: rgba(245, 166, 35, 0.15);
+    transform: scale(1.1);
+}
+
+.smp-bet-arrow:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+.smp-bet-chip {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid rgba(245, 166, 35, 0.45);
+    background: rgba(0, 0, 0, 0.4);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.smp-bet-chip:hover:not(:disabled) {
+    border-color: #f5a623;
+    background: rgba(245, 166, 35, 0.15);
+    transform: translateY(-2px);
+}
+
+.smp-bet-chip--active {
+    border-color: #f5a623;
+    background: rgba(245, 166, 35, 0.25);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(245, 166, 35, 0.4);
+}
+
+.smp-bet-chip:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* ── Spin button ─────────────────────────────────────────────────────────── */
 .smp-spin-btn {
     padding: 14px 56px;
     font-size: 1.1rem;
