@@ -1,13 +1,17 @@
 /**
  * PixiJS slot machine — 5 reels × 3 rows
  * Based on the official PixiJS "misc: Slots" example.
- * Symbols: 8 PNG images from src/assets/symbols/images/
+ *
+ * reel.png (1641×1022) is the frame background.
+ * REEL_GRID defines where the pink cell grid sits inside the image
+ * (measured from the actual pixel boundaries of the divider lines).
  */
 
-import { Application, useApplication } from '@pixi/react';
-import { Assets, BlurFilter, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import { useEffect, useRef, useState } from 'react';
+import {Application, useApplication} from '@pixi/react';
+import {Assets, BlurFilter, Container, Graphics, Sprite, Texture} from 'pixi.js';
+import {useEffect, useRef, useState} from 'react';
 
+import reelImg from '../assets/reel.png';
 import glassImg from '../assets/symbols/images/glass.png';
 import gobletImg from '../assets/symbols/images/goblet.png';
 import lipsImg from '../assets/symbols/images/lips.png';
@@ -17,42 +21,40 @@ import roseImg from '../assets/symbols/images/rose.png';
 import sevenImg from '../assets/symbols/images/seven.png';
 import starImg from '../assets/symbols/images/star.png';
 
-// ── Layout ─────────────────────────────────────────────────────────────────
+// ── Grid UV inset — pixel-precise from the pink divider lines in reel.png (1641×1022).
+// Vertical dividers at x ≈ 328/648/965/1282  → col width ≈ 311 px → grid x: 17..1596
+// Horizontal dividers at y ≈ 363/690          → row height ≈ 324 px → grid y: 39..1017
+const REEL_GRID = {x: 0.010, y: 0.038, w: 0.962, h: 0.957} as const;
+
+// ── Slot config ───────────────────────────────────────────────────────────────
 const REEL_COUNT = 5;
 const VISIBLE_ROWS = 3;
-const REEL_SIZE = 8; // virtual loop length (must be > VISIBLE_ROWS + 1)
-const SYMBOL_W = 120;
-const SYMBOL_H = 120;
-const REEL_GAP = 12;
+const REEL_SIZE = 10; // virtual loop length (must be > VISIBLE_ROWS + 1)
 const SPIN_SPEED = 25;
 
-// ── Speed preset ────────────────────────────────────────────────────────────
+// ── Speed preset (mirrors the official PixiJS example timing) ─────────────────
 const SPEED = {
     minSpin: 300,
     stopBase: 280,
     stopStep: 140,
-    stopDelayStep: 0,
 };
 
-// ── Symbol assets ───────────────────────────────────────────────────────────
-const SYMBOL_SRCS = [
-    { alias: 'glass', src: glassImg },
-    { alias: 'goblet', src: gobletImg },
-    { alias: 'lips', src: lipsImg },
-    { alias: 'lipstick', src: lipstickImg },
-    { alias: 'parfume', src: parfumeImg },
-    { alias: 'rose', src: roseImg },
-    { alias: 'seven', src: sevenImg },
-    { alias: 'star', src: starImg },
+// ── Assets ────────────────────────────────────────────────────────────────────
+const ALL_ASSETS = [
+    {alias: 'reel', src: reelImg},
+    {alias: 'glass', src: glassImg},
+    {alias: 'goblet', src: gobletImg},
+    {alias: 'lips', src: lipsImg},
+    {alias: 'lipstick', src: lipstickImg},
+    {alias: 'parfume', src: parfumeImg},
+    {alias: 'rose', src: roseImg},
+    {alias: 'seven', src: sevenImg},
+    {alias: 'star', src: starImg},
 ];
 
-const ALIASES = SYMBOL_SRCS.map((s) => s.alias);
+const SYMBOL_ALIASES = ALL_ASSETS.slice(1).map((a) => a.alias);
 
-// ── Colors ───────────────────────────────────────────────────────────────────
-const BG_COLOR = 0x0d0a1e;
-const REEL_BG_COLOR = 0x16213e;
-
-// ── Helpers (verbatim from official example) ─────────────────────────────────
+// ── Helpers (verbatim from official example) ──────────────────────────────────
 function lerp(a: number, b: number, t: number) {
     return a * (1 - t) + b * t;
 }
@@ -62,10 +64,10 @@ function backout(amount: number) {
 }
 
 function randomAlias() {
-    return ALIASES[Math.floor(Math.random() * ALIASES.length)];
+    return SYMBOL_ALIASES[Math.floor(Math.random() * SYMBOL_ALIASES.length)];
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface SlotSymbol {
     container: Container;
     sprite: Sprite;
@@ -90,27 +92,27 @@ interface Tween {
     onDone?: () => void;
 }
 
-// ── Sprite helpers ───────────────────────────────────────────────────────────
-function fitSprite(sprite: Sprite): void {
-    sprite.anchor.set(0.5);
-    sprite.x = SYMBOL_W / 2;
-    sprite.y = SYMBOL_H / 2;
-    const tw = sprite.texture.width || 1;
-    const th = sprite.texture.height || 1;
-    sprite.scale.set(Math.min((SYMBOL_W * 0.82) / tw, (SYMBOL_H * 0.82) / th));
-}
-
-function createSymbolSprite(alias: string): SlotSymbol {
+// ── Sprite helpers ────────────────────────────────────────────────────────────
+function createSymbolSprite(alias: string, cw: number, ch: number): SlotSymbol {
     const container = new Container();
     const sprite = new Sprite(Texture.from(alias));
-    fitSprite(sprite);
+    fitSprite(sprite, cw, ch);
     container.addChild(sprite);
-    return { container, sprite };
+    return {container, sprite};
 }
 
-function updateSymbol(sym: SlotSymbol, alias: string): void {
+function fitSprite(sprite: Sprite, cw: number, ch: number): void {
+    sprite.anchor.set(0.5);
+    sprite.x = cw / 2;
+    sprite.y = ch / 2;
+    const tw = sprite.texture.width || 1;
+    const th = sprite.texture.height || 1;
+    sprite.scale.set(Math.min((cw * 0.82) / tw, (ch * 0.82) / th));
+}
+
+function updateSymbol(sym: SlotSymbol, alias: string, cw: number, ch: number): void {
     sym.sprite.texture = Texture.from(alias);
-    fitSprite(sym.sprite);
+    fitSprite(sym.sprite, cw, ch);
 }
 
 // ── Inner PixiJS component ────────────────────────────────────────────────────
@@ -119,8 +121,8 @@ interface SlotReelsPngProps {
     onSpinComplete: () => void;
 }
 
-function SlotReelsPng({ spinning, onSpinComplete }: SlotReelsPngProps) {
-    const { app } = useApplication();
+function SlotReelsPng({spinning, onSpinComplete}: SlotReelsPngProps) {
+    const {app} = useApplication();
 
     const spinRef = useRef(spinning);
     const completeRef = useRef(onSpinComplete);
@@ -151,79 +153,51 @@ function SlotReelsPng({ spinning, onSpinComplete }: SlotReelsPngProps) {
 
     // ── One-time scene setup ──────────────────────────────────────────────────
     useEffect(() => {
-        const { width, height } = app.screen;
+        const {width, height} = app.screen;
 
-        const totalW = REEL_COUNT * SYMBOL_W + (REEL_COUNT - 1) * REEL_GAP;
-        const visH = VISIBLE_ROWS * SYMBOL_H;
-        const marginX = Math.round((width - totalW) / 2);
-        const marginY = Math.round((height - visH) / 2);
+        // Compute grid area from UV inset constants
+        const gridX = Math.round(width * REEL_GRID.x);
+        const gridY = Math.round(height * REEL_GRID.y);
+        const gridW = Math.round(width * REEL_GRID.w);
+        const gridH = Math.round(height * REEL_GRID.h);
+        const cellW = gridW / REEL_COUNT;
+        const cellH = gridH / VISIBLE_ROWS;
 
-        // Stage background
-        const bgG = new Graphics();
-        bgG.rect(0, 0, width, height).fill(BG_COLOR);
-        app.stage.addChild(bgG);
+        // Placeholder dark background shown before textures finish loading
+        const darkBg = new Graphics();
+        darkBg.rect(0, 0, width, height).fill(0x0d0a1e);
+        app.stage.addChild(darkBg);
 
-        // Column backgrounds with gold border
-        const colG = new Graphics();
-        for (let i = 0; i < REEL_COUNT; i++) {
-            const cx = marginX + i * (SYMBOL_W + REEL_GAP);
-
-            // Outer glow layers
-            colG.roundRect(cx - 6, marginY - 6, SYMBOL_W + 12, visH + 12, 10).stroke({
-                color: 0xff8c00,
-                width: 12,
-                alpha: 0.1,
-            });
-            colG.roundRect(cx - 3, marginY - 3, SYMBOL_W + 6, visH + 6, 9).stroke({
-                color: 0xffa040,
-                width: 6,
-                alpha: 0.22,
-            });
-            colG.roundRect(cx - 1, marginY - 1, SYMBOL_W + 2, visH + 2, 8).stroke({
-                color: 0xffd700,
-                width: 2,
-                alpha: 0.45,
-            });
-
-            // Column fill + border
-            colG.roundRect(cx, marginY, SYMBOL_W, visH, 6).fill(REEL_BG_COLOR);
-            colG.roundRect(cx, marginY, SYMBOL_W, visH, 6).stroke({
-                color: 0xffa500,
-                width: 2,
-                alpha: 0.9,
-            });
-        }
-        app.stage.addChild(colG);
-
-        // Container for all reels
+        // Container for reel columns — positioned at the grid inset
         const reelCont = new Container();
-        reelCont.x = marginX;
-        reelCont.y = marginY;
+        reelCont.x = gridX;
+        reelCont.y = gridY;
         app.stage.addChild(reelCont);
 
-        // Top / bottom covers to clip symbols outside the 3-row window
-        const topCover = new Graphics();
-        topCover.rect(0, 0, width, marginY).fill(BG_COLOR);
-        app.stage.addChild(topCover);
-
-        const botCover = new Graphics();
-        botCover.rect(0, marginY + visH, width, height).fill(BG_COLOR);
-        app.stage.addChild(botCover);
-
-        // ── Async: load textures then build reels ─────────────────────────────
         let cancelled = false;
 
         async function init() {
-            await Assets.load(SYMBOL_SRCS);
+            await Assets.load(ALL_ASSETS);
             if (cancelled) return;
 
             loadedRef.current = true;
 
+            // Swap placeholder dark BG for the actual reel.png frame
+            app.stage.removeChild(darkBg);
+            darkBg.destroy();
+
+            const bgSprite = new Sprite(Texture.from('reel'));
+            bgSprite.width = width;
+            bgSprite.height = height;
+            // Insert at index 0 so it stays below the reel container
+            app.stage.addChildAt(bgSprite, 0);
+
+            // Build reel columns
             const reels: Reel[] = [];
 
             for (let i = 0; i < REEL_COUNT; i++) {
                 const rc = new Container();
-                rc.x = i * (SYMBOL_W + REEL_GAP);
+                rc.x = i * cellW;
                 reelCont.addChild(rc);
 
                 const blur = new BlurFilter();
@@ -231,21 +205,21 @@ function SlotReelsPng({ spinning, onSpinComplete }: SlotReelsPngProps) {
                 blur.blurY = 0;
                 rc.filters = [blur];
 
-                // Mask clips symbols to exactly the 3-row visible window
+                // Mask clips each column to exactly cellW × (3 × cellH)
                 const mask = new Graphics();
-                mask.rect(0, 0, SYMBOL_W, visH).fill(0xffffff);
+                mask.rect(0, 0, cellW, gridH).fill(0xffffff);
                 rc.addChild(mask);
                 rc.mask = mask;
 
                 const symbols: SlotSymbol[] = [];
                 for (let j = 0; j < REEL_SIZE; j++) {
-                    const sym = createSymbolSprite(randomAlias());
-                    sym.container.y = j * SYMBOL_H;
+                    const sym = createSymbolSprite(randomAlias(), cellW, cellH);
+                    sym.container.y = j * cellH;
                     rc.addChild(sym.container);
                     symbols.push(sym);
                 }
 
-                reels.push({ rc, symbols, position: 0, prevPos: 0, blur, stopping: false });
+                reels.push({rc, symbols, position: 0, prevPos: 0, blur, stopping: false});
             }
 
             reelsRef.current = reels;
@@ -262,7 +236,7 @@ function SlotReelsPng({ spinning, onSpinComplete }: SlotReelsPngProps) {
             const now = Date.now();
             const reels = reelsRef.current;
 
-            // Fire stop tweens after minSpin ms
+            // Fire stop tweens after minSpin ms have elapsed
             if (
                 spinRef.current &&
                 !stopFiredRef.current &&
@@ -282,7 +256,7 @@ function SlotReelsPng({ spinning, onSpinComplete }: SlotReelsPngProps) {
                         reel,
                         from: reel.position,
                         to: targetPos,
-                        startMs: now + i * SPEED.stopDelayStep,
+                        startMs: now,
                         duration: SPEED.stopBase + i * SPEED.stopStep,
                         ease,
                         onDone: i === REEL_COUNT - 1 ? () => completeRef.current() : undefined,
@@ -316,11 +290,11 @@ function SlotReelsPng({ spinning, onSpinComplete }: SlotReelsPngProps) {
                 for (let j = 0; j < reel.symbols.length; j++) {
                     const sym = reel.symbols[j];
                     const prevY = sym.container.y;
-                    sym.container.y = ((reel.position + j) % REEL_SIZE) * SYMBOL_H - SYMBOL_H;
+                    sym.container.y = ((reel.position + j) % REEL_SIZE) * cellH - cellH;
 
                     // Swap symbol when it wraps off the top
-                    if (sym.container.y < 0 && prevY > SYMBOL_H && !reel.stopping) {
-                        updateSymbol(sym, randomAlias());
+                    if (sym.container.y < 0 && prevY > cellH && !reel.stopping) {
+                        updateSymbol(sym, randomAlias(), cellW, cellH);
                     }
                 }
             }
@@ -334,18 +308,15 @@ function SlotReelsPng({ spinning, onSpinComplete }: SlotReelsPngProps) {
             app.ticker.remove(onTick);
             tweensRef.current = [];
             reelsRef.current = [];
-            [bgG, colG, reelCont, topCover, botCover].forEach((c) => {
-                if (c.parent) c.parent.removeChild(c);
-                c.destroy({ children: true });
-            });
+            reelCont.destroy({children: true});
+            if (reelCont.parent) reelCont.parent.removeChild(reelCont);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [app]);
 
     return null;
 }
 
-// ── Exported component ────────────────────────────────────────────────────────
 export function SlotMachinePixi() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [spinning, setSpinning] = useState(false);
@@ -362,8 +333,8 @@ export function SlotMachinePixi() {
     return (
         <div className="smp-wrapper">
             <div ref={containerRef} className="smp-canvas">
-                <Application resizeTo={containerRef} background={BG_COLOR} antialias>
-                    <SlotReelsPng spinning={spinning} onSpinComplete={handleSpinComplete} />
+                <Application resizeTo={containerRef} background={0x0d0a1e} antialias>
+                    <SlotReelsPng spinning={spinning} onSpinComplete={handleSpinComplete}/>
                 </Application>
             </div>
 

@@ -109,8 +109,8 @@
 }
 
 .smp-canvas {
-    width: min(680px, 92vw);
-    height: min(480px, 68vw);
+    width: min(980px, 92vw);
+    aspect-ratio: 1641 / 1022;
     border-radius: 14px;
     overflow: hidden;
     box-shadow:
