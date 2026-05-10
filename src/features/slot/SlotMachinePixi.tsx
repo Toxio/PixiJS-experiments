@@ -34,7 +34,7 @@ export function SlotMachinePixi() {
         {status === 'error' && (
           <div className="smp-overlay smp-overlay--error">Connection failed</div>
         )}
-        <Application resizeTo={containerRef} antialias>
+        <Application resizeTo={containerRef} antialias backgroundAlpha={0}>
           <SlotReels
             spinning={spinning}
             targetMatrix={targetMatrix}

@@ -86,10 +86,6 @@
     position: relative;
     width: min(980px, 77vw);
     aspect-ratio: 1641 / 1022;
-    border-radius: 32px;
-    overflow: hidden;
-    box-shadow: 0 0 40px rgba(255, 165, 0, 0.25),
-    0 0 80px rgba(255, 100, 0, 0.1);
 }
 
 /* ── Overlay (connecting / error) ────────────────────────────────────────── */
