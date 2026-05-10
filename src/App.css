@@ -18,13 +18,13 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    /*gap: 24px;*/
+    gap: 24px;
 }
 
 .smp-canvas {
-    width: min(980px, 92vw);
+    width: min(980px, 77vw);
     aspect-ratio: 1641 / 1022;
-    border-radius: 14px;
+    border-radius: 32px;
     overflow: hidden;
     box-shadow: 0 0 40px rgba(255, 165, 0, 0.25),
     0 0 80px rgba(255, 100, 0, 0.1);
@@ -46,7 +46,6 @@
     transition: transform 0.1s ease,
     box-shadow 0.1s ease,
     opacity 0.15s ease;
-    margin-top: 50px;
 }
 
 .smp-spin-btn:hover:not(:disabled) {
