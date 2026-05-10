@@ -67,14 +67,14 @@ interface WinCell {
 
 const ALL_ASSETS = [
   { alias: 'reel', src: reelImg },
-  { alias: 'glass', src: glassImg },
+  { alias: 'rose', src: roseImg },
+  { alias: 'star', src: starImg },
   { alias: 'goblet', src: gobletImg },
+  { alias: 'seven', src: sevenImg },
   { alias: 'lips', src: lipsImg },
   { alias: 'lipstick', src: lipstickImg },
   { alias: 'parfume', src: parfumeImg },
-  { alias: 'rose', src: roseImg },
-  { alias: 'seven', src: sevenImg },
-  { alias: 'star', src: starImg },
+  { alias: 'glass', src: glassImg },
 ];
 
 const SYMBOL_ALIASES = ALL_ASSETS.slice(1).map((a) => a.alias);
@@ -96,21 +96,21 @@ function randomAlias() {
 function createWinSpineForSymbol(symIdx: number, ticker: Ticker): Spine | null {
   switch (symIdx) {
     case 0:
-      return createGlassSpine({ loop: true, animation: 'win', ticker });
-    case 1:
-      return createGobletSpine({ loop: true, ticker });
-    case 2:
-      return createLipsSpine({ loop: true, animation: 'win', ticker });
-    case 3:
-      return createLipstickSpine({ loop: true, ticker });
-    case 4:
-      return createParfumeSpine({ loop: true, ticker });
-    case 5:
       return createRoseSpine({ loop: true, ticker });
-    case 6:
-      return createSevenSpine({ loop: true, ticker });
-    case 7:
+    case 1:
       return createStarSpine({ loop: true, animation: 'win', ticker });
+    case 2:
+      return createGobletSpine({ loop: true, ticker });
+    case 3:
+      return createSevenSpine({ loop: true, ticker });
+    case 4:
+      return createLipsSpine({ loop: true, animation: 'win', ticker });
+    case 5:
+      return createLipstickSpine({ loop: true, ticker });
+    case 6:
+      return createParfumeSpine({ loop: true, ticker });
+    case 7:
+      return createGlassSpine({ loop: true, animation: 'win', ticker });
     default:
       return null;
   }
@@ -338,15 +338,15 @@ export function SlotReels({
     reelCont.y = gridY;
     app.stage.addChild(reelCont);
 
-    // Payline layer sits between the reel grid and the symbol win overlay
-    const paylineLayer = new Container();
-    app.stage.addChild(paylineLayer);
-    paylineLayerRef.current = paylineLayer;
-
     // Win overlay sits above the reels so spine animations are not clipped by reel masks
     const winOverlayCont = new Container();
     app.stage.addChild(winOverlayCont);
     winOverlayRef.current = winOverlayCont;
+
+    // Payline layer sits on top of everything — the animated line must be visible over symbols
+    const paylineLayer = new Container();
+    app.stage.addChild(paylineLayer);
+    paylineLayerRef.current = paylineLayer;
 
     let cancelled = false;
 
