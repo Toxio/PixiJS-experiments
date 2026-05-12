@@ -29,6 +29,12 @@ export interface UseSlotsHubSignalROptions {
   spinSpeed: 1 | 2 | 3;
 }
 
+export interface ForceSpinPreset {
+  matrix: number[][];
+  winLines: WinLine[];
+  winAmount: number;
+}
+
 export interface SlotsHubSignalRState {
   status: ConnStatus;
   balance: number;
@@ -43,6 +49,7 @@ export interface SlotsHubSignalRState {
   winAmount: number | null;
   winLines: WinLine[];
   spin: () => Promise<void>;
+  forceSpin: (preset: ForceSpinPreset) => void;
   handleSpinComplete: () => void;
 }
 
@@ -200,6 +207,22 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     }
   }, [spinning, status, betAmount]);
 
+  const forceSpin = useCallback(
+    (preset: ForceSpinPreset) => {
+      if (spinning) return;
+      setSpinning(true);
+      setWinAmount(null);
+      setWinLines([]);
+      setTargetMatrix(null);
+      setTimeout(() => {
+        setTargetMatrix(preset.matrix);
+        setWinLines(preset.winLines);
+        setWinAmount(preset.winAmount);
+      }, 0);
+    },
+    [spinning],
+  );
+
   const handleSpinComplete = useCallback(() => {
     setTargetMatrix((prev) => {
       if (prev) setMatrix(prev);
@@ -222,6 +245,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     winAmount,
     winLines,
     spin,
+    forceSpin,
     handleSpinComplete,
   };
 }

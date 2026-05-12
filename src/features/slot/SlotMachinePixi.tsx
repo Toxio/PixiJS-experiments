@@ -6,10 +6,12 @@ import { SlotBetRow } from './SlotBetRow';
 import { BalanceRow } from './BalanceRow';
 import { SlotReels } from './SlotReels';
 import { BuyBonusModal } from '../buyBonus/BuyBonusModal';
+import { TestModal } from './test/TestModal';
 
 export function SlotMachinePixi() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [buyBonusOpen, setBuyBonusOpen] = useState(false);
+  const [testOpen, setTestOpen] = useState(false);
 
   const {
     status,
@@ -24,6 +26,7 @@ export function SlotMachinePixi() {
     winAmount,
     winLines,
     spin,
+    forceSpin,
     handleSpinComplete,
   } = useSlotsHubSignalR({ spinSpeed: 2 });
 
@@ -79,6 +82,16 @@ export function SlotMachinePixi() {
                   ? 'Spinning…'
                   : 'SPIN'}
           </button>
+
+          <button
+            className="smp-test-btn"
+            type="button"
+            onClick={() => setTestOpen(true)}
+            disabled={spinning}
+            title="Open test preset panel"
+          >
+            🧪
+          </button>
         </div>
       </div>
 
@@ -94,6 +107,13 @@ export function SlotMachinePixi() {
           defaultBet={betAmount}
         />
       )}
+
+      <TestModal
+        open={testOpen}
+        onClose={() => setTestOpen(false)}
+        onSelect={forceSpin}
+        disabled={spinning}
+      />
     </div>
   );
 }
