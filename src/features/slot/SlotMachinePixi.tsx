@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { useSlotsHubSignalR } from '../../hooks/useSlotsHubSignalR';
 import { SlotBetRow } from './SlotBetRow';
 import { BalanceRow } from './BalanceRow';
-import { SlotReels } from './SlotReels';
+import { SlotReels } from './reels';
 import { BuyBonusModal } from '../buyBonus/BuyBonusModal';
 import { TestModal } from './test/TestModal';
 
