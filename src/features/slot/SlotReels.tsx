@@ -32,8 +32,8 @@ import { createRoseSpine, ensureRoseSpineLoaded } from '../../animation/roseSpin
 import { createSevenSpine, ensureSevenSpineLoaded } from '../../animation/sevenSpine';
 import {
   bigWinAnimationForOdd,
-  createBigWinSpine,
   createBigWinShineSpine,
+  createBigWinSpine,
   ensureBigWinSpineLoaded,
   layoutBigWinShineSpine,
   layoutBigWinSpine,
@@ -56,6 +56,9 @@ import { getPaylineForLineId } from '../../slot/paylines';
 
 // ── Grid UV inset — pixel-precise from the pink divider lines in reel.png (1641×1022).
 const REEL_GRID = { x: 0.01, y: 0.038, w: 0.962, h: 0.957 } as const;
+
+/** Shorter mask vs grid height so spinning symbols/blur don’t paint over the bottom frame. */
+const REEL_MASK_BOTTOM_PAD_FRAC = 0.012;
 
 const REEL_COUNT = 5;
 const VISIBLE_ROWS = 3;
@@ -555,6 +558,7 @@ export function SlotReels({
     const gridY = Math.round(height * REEL_GRID.y);
     const gridW = Math.round(width * REEL_GRID.w);
     const gridH = Math.round(height * REEL_GRID.h);
+    const maskH = Math.max(1, Math.round(gridH * (1 - REEL_MASK_BOTTOM_PAD_FRAC)));
     const cellW = gridW / REEL_COUNT;
     const cellH = gridH / VISIBLE_ROWS;
 
@@ -629,9 +633,9 @@ export function SlotReels({
         blur.blurY = 0;
         rc.filters = [blur];
 
-        // Mask clips each column to exactly cellW × (3 × cellH)
+        // Mask clips each column; bottom inset keeps spin/blur off the frame bezel.
         const mask = new Graphics();
-        mask.rect(0, 0, cellW, gridH).fill(0xffffff);
+        mask.rect(0, 0, cellW, maskH).fill(0xffffff);
         rc.addChild(mask);
         rc.mask = mask;
 
