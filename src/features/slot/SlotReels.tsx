@@ -182,13 +182,15 @@ function layoutSpineInCell(
 
 const EXPANDED_WILD_SIDE_PAD_FRAC = 0.048;
 /** Cover-scale height vs column (still uses max(scaleW, scaleH)). */
-const EXPANDED_WILD_HEIGHT_MUL = 1.2;
+const EXPANDED_WILD_HEIGHT_MUL = 1.22;
 /** Extra downward offset after centering — fraction of full column height. */
 const EXPANDED_WILD_SHIFT_DOWN_FRAC = 0.09;
+/** Nudge left — fraction of one reel cell width (positive = move left). */
+const EXPANDED_WILD_SHIFT_LEFT_FRAC = 0.1;
 
 /**
  * Expanding wild: cover-style scale with **horizontal padding** inset from reel edges,
- * then shift **down** so the frame sits lower in the column.
+ * then shift **down** and slightly **left** so the frame aligns visually in the column.
  */
 function layoutWildSpineExpandedInColumn(
   spine: Spine,
@@ -206,7 +208,7 @@ function layoutWildSpineExpandedInColumn(
   const targetH = columnHeight * 0.98 * EXPANDED_WILD_HEIGHT_MUL;
   const s = Math.max(targetW / bw, targetH / bh);
   spine.scale.set(s);
-  const nx = absXCenter - (lb.x + lb.width / 2) * s;
+  const nx = absXCenter - (lb.x + lb.width / 2) * s - cellW * EXPANDED_WILD_SHIFT_LEFT_FRAC;
   let ny = absYCenter - (lb.y + lb.height / 2) * s;
   ny += columnHeight * EXPANDED_WILD_SHIFT_DOWN_FRAC;
   spine.position.set(nx, ny);
