@@ -267,6 +267,24 @@ export const TEST_PRESETS: TestPreset[] = [
     },
   },
   {
+    id: 'scatter-mid',
+    label: '5× Scatter',
+    subtitle: 'Line 1 · Middle row',
+    badge: '📦×5',
+    badgeColor: '#fbbf24',
+    preset: {
+      matrix: buildMatrix([
+        [7, 10, 4],
+        [6, 10, 3],
+        [11, 10, 5],
+        [2, 10, 7],
+        [4, 10, 6],
+      ]),
+      winLines: [wl(10, 1, 5, 150)],
+      winAmount: 150,
+    },
+  },
+  {
     id: 'heels-mid',
     label: '5× Heels',
     subtitle: 'Line 1 · Middle row',

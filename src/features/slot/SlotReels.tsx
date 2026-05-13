@@ -14,6 +14,7 @@ import { useEffect, useRef } from 'react';
 import { createGlassSpine, ensureGlassSpineLoaded } from '../../animation/glassSpine';
 import { createGobletSpine, ensureGobletSpineLoaded } from '../../animation/gobletSpine';
 import { createHeelsSpine, ensureHeelsSpineLoaded } from '../../animation/heelsSpine';
+import { createScatterSpine, ensureScatterSpineLoaded } from '../../animation/scatterSpine';
 import { createWildSpine, ensureWildSpineLoaded, type WildAnimationName } from '../../animation/wildSpine';
 import {
   createPaylineAnimation,
@@ -29,6 +30,7 @@ import { createStarSpine, ensureStarSpineLoaded } from '../../animation/starSpin
 import reelImg from '../../assets/reel.png';
 import glassImg from '../../assets/symbols/images/glass.png';
 import heelsImg from '../../assets/heels/heels.png';
+import scatterImg from '../../assets/scatter/scatter.png';
 import wildImg from '../../assets/wild/wild-icon.png';
 import gobletImg from '../../assets/symbols/images/goblet.png';
 import lipsImg from '../../assets/symbols/images/lips.png';
@@ -81,6 +83,7 @@ const ALL_ASSETS = [
   { alias: 'glass', src: glassImg },
   { alias: 'heels', src: heelsImg },
   { alias: 'wild', src: wildImg },
+  { alias: 'scatter', src: scatterImg },
 ];
 
 /** Maps server symbol index (1-based) → PixiJS texture alias. */
@@ -94,7 +97,7 @@ const SYMBOL_MAP: Record<number, string> = {
   7: 'goblet',
   8: 'heels',
   9: 'wild',
-  // 10: scatter (later)
+  10: 'scatter',
   11: 'star',
 };
 
@@ -141,6 +144,8 @@ function createWinSpineForSymbol(serverIdx: number, ticker: Ticker, row?: number
       const wildAnim: WildAnimationName = row === 0 ? 'wild1' : row === 2 ? 'wild3' : 'wild2';
       return createWildSpine({ loop: true, animation: wildAnim, ticker });
     }
+    case 10:
+      return createScatterSpine({ loop: true, animation: 'win', ticker });
     case 11:
       return createStarSpine({ loop: true, animation: 'win', ticker });
     default:
@@ -463,6 +468,7 @@ export function SlotReels({
       ensureStarSpineLoaded(),
       ensureHeelsSpineLoaded(),
       ensureWildSpineLoaded(),
+      ensureScatterSpineLoaded(),
       ensureLineAssetsLoaded(),
     ])
       .then(() => {
