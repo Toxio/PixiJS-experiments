@@ -1,11 +1,11 @@
 import type { HubConnection } from '@microsoft/signalr';
 import {
+  type Dispatch,
+  type SetStateAction,
   useCallback,
   useEffect,
   useRef,
   useState,
-  type Dispatch,
-  type SetStateAction,
 } from 'react';
 import { createSlotsHubConnection, DEFAULT_SLOTS_INITIAL_STATE } from '../api/slotsHubConnection';
 
@@ -33,6 +33,7 @@ export interface ForceSpinPreset {
   matrix: number[][];
   winLines: WinLine[];
   winAmount: number;
+  expandingWild?: number[];
 }
 
 export interface SlotsHubSignalRState {
@@ -48,6 +49,7 @@ export interface SlotsHubSignalRState {
   targetMatrix: number[][] | null;
   winAmount: number | null;
   winLines: WinLine[];
+  expandingWild: number[];
   spin: () => Promise<void>;
   forceSpin: (preset: ForceSpinPreset) => void;
   handleSpinComplete: () => void;
@@ -117,6 +119,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
   const [targetMatrix, setTargetMatrix] = useState<number[][] | null>(null);
   const [winAmount, setWinAmount] = useState<number | null>(null);
   const [winLines, setWinLines] = useState<WinLine[]>([]);
+  const [expandingWild, setExpandingWild] = useState<number[]>([0, 0, 0, 0, 0]);
 
   useEffect(() => {
     const connection = createSlotsHubConnection();
@@ -161,6 +164,12 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
           winAmount: Number(w.LineWinAmount ?? w.lineWinAmount),
         })),
       );
+      const rawEW = (additional?.ExpandingWild ?? additional?.expandingWild) as
+        | number[]
+        | undefined;
+      setExpandingWild(
+        Array.isArray(rawEW) && rawEW.length === REEL_COUNT ? rawEW.map(Number) : [0, 0, 0, 0, 0],
+      );
       if (mat?.length) setTargetMatrix(mat);
     });
 
@@ -196,6 +205,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     setSpinning(true);
     setWinAmount(null);
     setWinLines([]);
+    setExpandingWild([0, 0, 0, 0, 0]);
     setTargetMatrix(null);
     try {
       await connRef.current.invoke('GameAction', {
@@ -213,11 +223,13 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
       setSpinning(true);
       setWinAmount(null);
       setWinLines([]);
+      setExpandingWild([0, 0, 0, 0, 0]);
       setTargetMatrix(null);
       setTimeout(() => {
         setTargetMatrix(preset.matrix);
         setWinLines(preset.winLines);
         setWinAmount(preset.winAmount);
+        setExpandingWild(preset.expandingWild ?? [0, 0, 0, 0, 0]);
       }, 0);
     },
     [spinning],
@@ -244,6 +256,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     targetMatrix,
     winAmount,
     winLines,
+    expandingWild,
     spin,
     forceSpin,
     handleSpinComplete,

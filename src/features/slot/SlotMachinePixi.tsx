@@ -25,6 +25,7 @@ export function SlotMachinePixi() {
     targetMatrix,
     winAmount,
     winLines,
+    expandingWild,
     spin,
     forceSpin,
     handleSpinComplete,
@@ -45,6 +46,7 @@ export function SlotMachinePixi() {
             targetMatrix={targetMatrix}
             matrix={matrix}
             winLines={winLines}
+            expandingWild={expandingWild}
             onSpinComplete={handleSpinComplete}
           />
         </Application>
