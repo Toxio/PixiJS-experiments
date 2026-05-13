@@ -180,16 +180,15 @@ function layoutSpineInCell(
   spine.position.set(absX - (lb.x + lb.width / 2) * s, absY - (lb.y + lb.height / 2) * s);
 }
 
-const EXPANDED_WILD_PAD = 0.995;
-/** Taller vertical target vs grid height — fills leftover gap toward frame bottom (cover-style). */
-const EXPANDED_WILD_HEIGHT_MUL = 1.14;
-/** Fraction of column height: shift wild downward after scale (fills dead band above bottom frame). */
-const EXPANDED_WILD_Y_BIAS_FRAC = 0.055;
+const EXPANDED_WILD_SIDE_PAD_FRAC = 0.048;
+/** Cover-scale height vs column (still uses max(scaleW, scaleH)). */
+const EXPANDED_WILD_HEIGHT_MUL = 1.2;
+/** Extra downward offset after centering — fraction of full column height. */
+const EXPANDED_WILD_SHIFT_DOWN_FRAC = 0.09;
 
 /**
- * Scale the wild so it always covers the full column (all 3 reel cells).
- * Uses "cover" (max of width / height scale) so wild1 / wild2 / wild3 all span
- * the full height and width of the column rectangle, not a single cell.
+ * Expanding wild: cover-style scale with **horizontal padding** inset from reel edges,
+ * then shift **down** so the frame sits lower in the column.
  */
 function layoutWildSpineExpandedInColumn(
   spine: Spine,
@@ -202,13 +201,14 @@ function layoutWildSpineExpandedInColumn(
   const lb = spine.getLocalBounds();
   const bw = lb.width > 0 ? lb.width : 1;
   const bh = lb.height > 0 ? lb.height : 1;
-  const targetW = cellW * EXPANDED_WILD_PAD;
-  const targetH = columnHeight * EXPANDED_WILD_PAD * EXPANDED_WILD_HEIGHT_MUL;
+  const paddedW = cellW * Math.max(0.55, 1 - 2 * EXPANDED_WILD_SIDE_PAD_FRAC);
+  const targetW = paddedW;
+  const targetH = columnHeight * 0.98 * EXPANDED_WILD_HEIGHT_MUL;
   const s = Math.max(targetW / bw, targetH / bh);
   spine.scale.set(s);
   const nx = absXCenter - (lb.x + lb.width / 2) * s;
   let ny = absYCenter - (lb.y + lb.height / 2) * s;
-  ny += columnHeight * EXPANDED_WILD_Y_BIAS_FRAC;
+  ny += columnHeight * EXPANDED_WILD_SHIFT_DOWN_FRAC;
   spine.position.set(nx, ny);
 }
 
