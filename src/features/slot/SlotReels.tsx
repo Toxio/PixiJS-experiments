@@ -30,6 +30,14 @@ import { createLipstickSpine, ensureLipstickSpineLoaded } from '../../animation/
 import { createParfumeSpine, ensureParfumeSpineLoaded } from '../../animation/parfumeSpine';
 import { createRoseSpine, ensureRoseSpineLoaded } from '../../animation/roseSpine';
 import { createSevenSpine, ensureSevenSpineLoaded } from '../../animation/sevenSpine';
+import {
+  bigWinAnimationForOdd,
+  createBigWinSpine,
+  createBigWinShineSpine,
+  ensureBigWinSpineLoaded,
+  layoutBigWinShineSpine,
+  layoutBigWinSpine,
+} from '../../animation/bigWinSpine';
 import { createStarSpine, ensureStarSpineLoaded } from '../../animation/starSpine';
 import reelImg from '../../assets/reel.png';
 import glassImg from '../../assets/symbols/images/glass.png';
@@ -277,6 +285,8 @@ export interface SlotReelsProps {
   winLines: WinLine[];
   /** Per-column expanding-wild flags (length 5). Non-zero = wild animates in that column. */
   expandingWild: number[];
+  /** Total spin multiplier (`Odd`); triggers BIG / MEGA / SUPER overlay at 20× / 50× / 100×. */
+  spinOdd: number | null;
   onSpinComplete: () => void;
 }
 
@@ -287,6 +297,7 @@ export function SlotReels({
   onSpinComplete,
   winLines,
   expandingWild,
+  spinOdd,
 }: SlotReelsProps) {
   const { app } = useApplication();
 
@@ -303,6 +314,9 @@ export function SlotReels({
 
   const winOverlayRef = useRef<Container | null>(null);
   const spineReadyRef = useRef(false);
+
+  const bigWinLayerRef = useRef<Container | null>(null);
+  const prevSpinningBigWinRef = useRef(spinning);
 
   /** Persistent overlay for wild cells — always visible regardless of win-cycle phase. */
   const wildOverlayRef = useRef<Container | null>(null);
@@ -341,6 +355,13 @@ export function SlotReels({
   // Clear win overlay and reset per-spin state when a new spin begins
   useEffect(() => {
     if (!spinning) return;
+    const bwLayer = bigWinLayerRef.current;
+    if (bwLayer) {
+      for (const c of [...bwLayer.children]) {
+        bwLayer.removeChild(c);
+        c.destroy();
+      }
+    }
     spinStartRef.current = Date.now();
     stopFiredRef.current = false;
     tweensRef.current = [];
@@ -498,6 +519,39 @@ export function SlotReels({
     }
   }, [spinning, matrix, winLines, expandingWild, app, sceneAssetsEpoch]);
 
+  // BIG / MEGA / SUPER win banner — loops until the player starts the next spin.
+  useEffect(() => {
+    const justStopped = prevSpinningBigWinRef.current && !spinning;
+    prevSpinningBigWinRef.current = spinning;
+    if (!justStopped) return;
+
+    const tier = spinOdd != null ? bigWinAnimationForOdd(spinOdd) : null;
+    if (!tier || winLines.length === 0) return;
+
+    const appRef = app;
+    void ensureBigWinSpineLoaded().then(() => {
+      if (spinRef.current) return;
+      const stillTier = spinOdd != null ? bigWinAnimationForOdd(spinOdd) : null;
+      if (stillTier !== tier) return;
+      const layer = bigWinLayerRef.current;
+      if (!layer || !appRef?.ticker) return;
+
+      for (const c of [...layer.children]) {
+        layer.removeChild(c);
+        c.destroy();
+      }
+
+      const { width, height } = appRef.screen;
+      const shine = createBigWinShineSpine({ ticker: appRef.ticker, loop: true });
+      layoutBigWinShineSpine(shine, width, height);
+      layer.addChild(shine);
+
+      const spine = createBigWinSpine({ animation: tier, ticker: appRef.ticker, loop: true });
+      layoutBigWinSpine(spine, width, height);
+      layer.addChild(spine);
+    });
+  }, [spinning, spinOdd, winLines.length, app]);
+
   // One-time scene setup
   useEffect(() => {
     const { width, height } = app.screen;
@@ -529,6 +583,10 @@ export function SlotReels({
     app.stage.addChild(paylineLayer);
     paylineLayerRef.current = paylineLayer;
 
+    const bigWinLayer = new Container();
+    app.stage.addChild(bigWinLayer);
+    bigWinLayerRef.current = bigWinLayer;
+
     let cancelled = false;
 
     // Preload all spine assets in parallel with PNG assets
@@ -544,6 +602,7 @@ export function SlotReels({
       ensureHeelsSpineLoaded(),
       ensureWildSpineLoaded(),
       ensureScatterSpineLoaded(),
+      ensureBigWinSpineLoaded(),
       ensureLineAssetsLoaded(),
     ])
       .then(() => {
@@ -781,6 +840,7 @@ export function SlotReels({
       reelsRef.current = [];
       winOverlayRef.current = null;
       paylineLayerRef.current = null;
+      bigWinLayerRef.current = null;
       activateWinLineRef.current = null;
       for (const spine of activeWinSpinesRef.current) spine.destroy();
       activeWinSpinesRef.current = [];
@@ -795,6 +855,7 @@ export function SlotReels({
       wildOverlayCont.destroy({ children: true });
       winOverlayCont.destroy({ children: true });
       paylineLayer.destroy({ children: true });
+      bigWinLayer.destroy({ children: true });
       reelCont.destroy({ children: true });
       if (reelCont.parent) reelCont.parent.removeChild(reelCont);
     };

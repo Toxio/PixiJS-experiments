@@ -34,6 +34,8 @@ export interface ForceSpinPreset {
   winLines: WinLine[];
   winAmount: number;
   expandingWild?: number[];
+  /** Total spin multiplier from server (`Odd`); drives BIG / MEGA / SUPER win overlay. */
+  odd?: number;
 }
 
 export interface SlotsHubSignalRState {
@@ -50,6 +52,8 @@ export interface SlotsHubSignalRState {
   winAmount: number | null;
   winLines: WinLine[];
   expandingWild: number[];
+  /** Last completed spin total multiplier (`Odd` from GameActionResult). */
+  spinOdd: number | null;
   spin: () => Promise<void>;
   forceSpin: (preset: ForceSpinPreset) => void;
   handleSpinComplete: () => void;
@@ -120,6 +124,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
   const [winAmount, setWinAmount] = useState<number | null>(null);
   const [winLines, setWinLines] = useState<WinLine[]>([]);
   const [expandingWild, setExpandingWild] = useState<number[]>([0, 0, 0, 0, 0]);
+  const [spinOdd, setSpinOdd] = useState<number | null>(null);
 
   useEffect(() => {
     const connection = createSlotsHubConnection();
@@ -156,6 +161,8 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
         payload?.WinAmount ?? payload?.winAmount ?? data.WinAmount ?? data.winAmount ?? 0,
       );
       setWinAmount(Number.isFinite(rawWin) ? rawWin : 0);
+      const rawOdd = Number(payload?.Odd ?? payload?.odd ?? data.Odd ?? data.odd ?? Number.NaN);
+      setSpinOdd(Number.isFinite(rawOdd) ? rawOdd : null);
       setWinLines(
         (rawWins ?? []).map((w) => ({
           symbol: Number(w.Symbol ?? w.symbol),
@@ -206,6 +213,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     setWinAmount(null);
     setWinLines([]);
     setExpandingWild([0, 0, 0, 0, 0]);
+    setSpinOdd(null);
     setTargetMatrix(null);
     try {
       await connRef.current.invoke('GameAction', {
@@ -224,12 +232,14 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
       setWinAmount(null);
       setWinLines([]);
       setExpandingWild([0, 0, 0, 0, 0]);
+      setSpinOdd(null);
       setTargetMatrix(null);
       setTimeout(() => {
         setTargetMatrix(preset.matrix);
         setWinLines(preset.winLines);
         setWinAmount(preset.winAmount);
         setExpandingWild(preset.expandingWild ?? [0, 0, 0, 0, 0]);
+        setSpinOdd(preset.odd !== undefined && Number.isFinite(preset.odd) ? preset.odd : null);
       }, 0);
     },
     [spinning],
@@ -257,6 +267,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     winAmount,
     winLines,
     expandingWild,
+    spinOdd,
     spin,
     forceSpin,
     handleSpinComplete,
