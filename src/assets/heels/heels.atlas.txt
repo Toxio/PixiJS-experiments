@@ -1,0 +1,6 @@
+heels.png
+size:295,304
+filter:Linear,Linear
+pma:true
+heels
+bounds:2,2,291,300

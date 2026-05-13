@@ -13,6 +13,8 @@ import { useEffect, useRef } from 'react';
 
 import { createGlassSpine, ensureGlassSpineLoaded } from '../../animation/glassSpine';
 import { createGobletSpine, ensureGobletSpineLoaded } from '../../animation/gobletSpine';
+import { createHeelsSpine, ensureHeelsSpineLoaded } from '../../animation/heelsSpine';
+import { createWildSpine, ensureWildSpineLoaded, type WildAnimationName } from '../../animation/wildSpine';
 import {
   createPaylineAnimation,
   ensureLineAssetsLoaded,
@@ -26,6 +28,8 @@ import { createSevenSpine, ensureSevenSpineLoaded } from '../../animation/sevenS
 import { createStarSpine, ensureStarSpineLoaded } from '../../animation/starSpine';
 import reelImg from '../../assets/reel.png';
 import glassImg from '../../assets/symbols/images/glass.png';
+import heelsImg from '../../assets/heels/heels.png';
+import wildImg from '../../assets/wild/wild.png';
 import gobletImg from '../../assets/symbols/images/goblet.png';
 import lipsImg from '../../assets/symbols/images/lips.png';
 import lipstickImg from '../../assets/symbols/images/lipstick.png';
@@ -62,7 +66,7 @@ const LINE_DELAY_MS = 300;
 interface WinCell {
   col: number;
   row: number;
-  symIdx: number;
+  serverIdx: number;
 }
 
 const ALL_ASSETS = [
@@ -75,9 +79,30 @@ const ALL_ASSETS = [
   { alias: 'lipstick', src: lipstickImg },
   { alias: 'parfume', src: parfumeImg },
   { alias: 'glass', src: glassImg },
+  { alias: 'heels', src: heelsImg },
+  { alias: 'wild', src: wildImg },
 ];
 
-const SYMBOL_ALIASES = ALL_ASSETS.slice(1).map((a) => a.alias);
+/** Maps server symbol index (1-based) → PixiJS texture alias. */
+const SYMBOL_MAP: Record<number, string> = {
+  1: 'seven',
+  2: 'lips',
+  3: 'parfume',
+  4: 'rose',
+  5: 'glass',
+  6: 'lipstick',
+  7: 'goblet',
+  8: 'heels',
+  // 9: wild  (later)
+  // 10: scatter (later)
+  11: 'star',
+};
+
+const SYMBOL_ALIASES = Object.values(SYMBOL_MAP);
+
+function symbolAlias(serverIdx: number): string {
+  return SYMBOL_MAP[serverIdx] ?? 'seven';
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function lerp(a: number, b: number, t: number) {
@@ -92,25 +117,27 @@ function randomAlias() {
   return SYMBOL_ALIASES[Math.floor(Math.random() * SYMBOL_ALIASES.length)];
 }
 
-/** Create the win-animation Spine for a given symbol index (0–7). */
-function createWinSpineForSymbol(symIdx: number, ticker: Ticker): Spine | null {
-  switch (symIdx) {
-    case 0:
-      return createRoseSpine({ loop: true, ticker });
+/** Create the win-animation Spine for a given server symbol index (1-based). */
+function createWinSpineForSymbol(serverIdx: number, ticker: Ticker): Spine | null {
+  switch (serverIdx) {
     case 1:
-      return createStarSpine({ loop: true, animation: 'win', ticker });
-    case 2:
-      return createGobletSpine({ loop: true, ticker });
-    case 3:
       return createSevenSpine({ loop: true, ticker });
-    case 4:
+    case 2:
       return createLipsSpine({ loop: true, animation: 'win', ticker });
-    case 5:
-      return createLipstickSpine({ loop: true, ticker });
-    case 6:
+    case 3:
       return createParfumeSpine({ loop: true, ticker });
-    case 7:
+    case 4:
+      return createRoseSpine({ loop: true, ticker });
+    case 5:
       return createGlassSpine({ loop: true, animation: 'win', ticker });
+    case 6:
+      return createLipstickSpine({ loop: true, ticker });
+    case 7:
+      return createGobletSpine({ loop: true, ticker });
+    case 8:
+      return createHeelsSpine({ loop: true, animation: 'win', ticker });
+    case 11:
+      return createStarSpine({ loop: true, animation: 'win', ticker });
     default:
       return null;
   }
@@ -305,13 +332,13 @@ export function SlotReels({
       paylineAnimsRef.current.push(anim);
 
       // Cells whose symbols should animate while this line is shown
-      const symIdx = win.symbol % SYMBOL_ALIASES.length;
+      const serverIdx = win.symbol;
       const cells: WinCell[] = [];
       for (let col = 0; col < win.count && col < REEL_COUNT; col++) {
         const row = payline[col] ?? 1;
         // Skip cells where the settled matrix shows a different symbol (wild sub)
-        if ((matrix[col]?.[row] ?? -1) % SYMBOL_ALIASES.length !== symIdx) continue;
-        cells.push({ col, row, symIdx });
+        if (symbolAlias(matrix[col]?.[row] ?? -1) !== symbolAlias(serverIdx)) continue;
+        cells.push({ col, row, serverIdx });
       }
       winCellsByLineRef.current.push(cells);
     }
@@ -360,6 +387,7 @@ export function SlotReels({
       ensureRoseSpineLoaded(),
       ensureSevenSpineLoaded(),
       ensureStarSpineLoaded(),
+      ensureHeelsSpineLoaded(),
       ensureLineAssetsLoaded(),
     ])
       .then(() => {
@@ -444,8 +472,8 @@ export function SlotReels({
       if (!spineReadyRef.current) return;
 
       const newSpines: Spine[] = [];
-      for (const { col, row, symIdx } of winCellsByLineRef.current[idx] ?? []) {
-        const spine = createWinSpineForSymbol(symIdx, app.ticker);
+      for (const { col, row, serverIdx } of winCellsByLineRef.current[idx] ?? []) {
+        const spine = createWinSpineForSymbol(serverIdx, app.ticker);
         if (!spine) continue;
         const absX = gridX + col * cellW + cellW / 2;
         const absY = gridY + row * cellH + cellH / 2;
@@ -490,12 +518,7 @@ export function SlotReels({
             [1, 2, 3].forEach((symIdx, rowIdx) => {
               const sym = reel.symbols[symIdx];
               if (sym && col[rowIdx] !== undefined) {
-                updateSymbol(
-                  sym,
-                  SYMBOL_ALIASES[col[rowIdx] % SYMBOL_ALIASES.length],
-                  cellW,
-                  cellH,
-                );
+                updateSymbol(sym, symbolAlias(col[rowIdx]), cellW, cellH);
               }
             });
           }
