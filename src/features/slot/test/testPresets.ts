@@ -267,6 +267,26 @@ export const TEST_PRESETS: TestPreset[] = [
     },
   },
   {
+    id: 'seven-3-wild-col2',
+    label: '3× Seven + Wild',
+    subtitle: 'Line 1 · Wild in 2nd column',
+    badge: '7️⃣×3👸',
+    badgeColor: '#f472b6',
+    preset: {
+      // Middle row (line 1): seven | wild | seven | … — three-of-a-kind with substitute on column 2.
+      matrix: buildMatrix([
+        [11, 1, 7],
+        [9, 4, 6],
+        [8, 1, 5],
+        [3, 11, 4],
+        [2, 7, 11],
+      ]),
+      winLines: [wl(1, 1, 3, 15)],
+      winAmount: 15,
+      expandingWild: [0, 9, 0, 0, 0],
+    },
+  },
+  {
     id: 'scatter-mid',
     label: '5× Scatter',
     subtitle: 'Line 1 · Middle row',

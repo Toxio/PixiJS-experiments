@@ -9,13 +9,17 @@
 import { Spine } from '@esotericsoftware/spine-pixi-v8';
 import { useApplication } from '@pixi/react';
 import { Assets, BlurFilter, Container, Graphics, Sprite, Texture, type Ticker } from 'pixi.js';
-import { useEffect, useRef } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 
 import { createGlassSpine, ensureGlassSpineLoaded } from '../../animation/glassSpine';
 import { createGobletSpine, ensureGobletSpineLoaded } from '../../animation/gobletSpine';
 import { createHeelsSpine, ensureHeelsSpineLoaded } from '../../animation/heelsSpine';
 import { createScatterSpine, ensureScatterSpineLoaded } from '../../animation/scatterSpine';
-import { createWildSpine, ensureWildSpineLoaded, type WildAnimationName } from '../../animation/wildSpine';
+import {
+  createWildSpine,
+  ensureWildSpineLoaded,
+  type WildAnimationName,
+} from '../../animation/wildSpine';
 import {
   createPaylineAnimation,
   ensureLineAssetsLoaded,
@@ -120,6 +124,10 @@ function randomAlias() {
   return SYMBOL_ALIASES[Math.floor(Math.random() * SYMBOL_ALIASES.length)];
 }
 
+function wildAnimationForRow(row: number): WildAnimationName {
+  return row === 0 ? 'wild1' : row === 2 ? 'wild3' : 'wild2';
+}
+
 /** Create the win-animation Spine for a given server symbol index (1-based).
  *  `row` (0=top, 1=mid, 2=bot) is required for wild (index 9) to pick wild1/2/3. */
 function createWinSpineForSymbol(serverIdx: number, ticker: Ticker, row?: number): Spine | null {
@@ -141,8 +149,8 @@ function createWinSpineForSymbol(serverIdx: number, ticker: Ticker, row?: number
     case 8:
       return createHeelsSpine({ loop: true, animation: 'win', ticker });
     case 9: {
-      const wildAnim: WildAnimationName = row === 0 ? 'wild1' : row === 2 ? 'wild3' : 'wild2';
-      return createWildSpine({ loop: true, animation: wildAnim, ticker });
+      const r = row ?? 1;
+      return createWildSpine({ loop: true, animation: wildAnimationForRow(r), ticker });
     }
     case 10:
       return createScatterSpine({ loop: true, animation: 'win', ticker });
@@ -172,10 +180,48 @@ function layoutSpineInCell(
   spine.position.set(absX - (lb.x + lb.width / 2) * s, absY - (lb.y + lb.height / 2) * s);
 }
 
+const EXPANDED_WILD_PAD = 0.995;
+/** Taller vertical target vs grid height — fills leftover gap toward frame bottom (cover-style). */
+const EXPANDED_WILD_HEIGHT_MUL = 1.14;
+/** Fraction of column height: shift wild downward after scale (fills dead band above bottom frame). */
+const EXPANDED_WILD_Y_BIAS_FRAC = 0.055;
+
+/**
+ * Scale the wild so it always covers the full column (all 3 reel cells).
+ * Uses "cover" (max of width / height scale) so wild1 / wild2 / wild3 all span
+ * the full height and width of the column rectangle, not a single cell.
+ */
+function layoutWildSpineExpandedInColumn(
+  spine: Spine,
+  absXCenter: number,
+  absYCenter: number,
+  cellW: number,
+  columnHeight: number,
+): void {
+  spine.update(0);
+  const lb = spine.getLocalBounds();
+  const bw = lb.width > 0 ? lb.width : 1;
+  const bh = lb.height > 0 ? lb.height : 1;
+  const targetW = cellW * EXPANDED_WILD_PAD;
+  const targetH = columnHeight * EXPANDED_WILD_PAD * EXPANDED_WILD_HEIGHT_MUL;
+  const s = Math.max(targetW / bw, targetH / bh);
+  spine.scale.set(s);
+  const nx = absXCenter - (lb.x + lb.width / 2) * s;
+  let ny = absYCenter - (lb.y + lb.height / 2) * s;
+  ny += columnHeight * EXPANDED_WILD_Y_BIAS_FRAC;
+  spine.position.set(nx, ny);
+}
+
 // ── Internal types ────────────────────────────────────────────────────────────
 interface SlotSymbol {
   container: Container;
   sprite: Sprite;
+}
+
+function setSlotSymbolVisibility(sym: SlotSymbol | undefined, visible: boolean): void {
+  if (!sym) return;
+  sym.sprite.visible = visible;
+  sym.container.visible = visible;
 }
 
 interface Reel {
@@ -245,6 +291,8 @@ export function SlotReels({
   const spinRef = useRef(spinning);
   const completeRef = useRef(onSpinComplete);
   const reelsRef = useRef<Reel[]>([]);
+  /** Bumps when reel strips are built or Spine preload finishes — retriggers expanding-wild sprite hides. */
+  const [sceneAssetsEpoch, bumpSceneAssets] = useReducer((n: number) => n + 1, 0);
   const tweensRef = useRef<Tween[]>([]);
   const spinStartRef = useRef(0);
   const stopFiredRef = useRef(false);
@@ -274,9 +322,7 @@ export function SlotReels({
   /** Exposed by the one-time setup effect so the payline effect can trigger line 0. */
   const activateWinLineRef = useRef<((idx: number) => void) | null>(null);
   /** Hides static sprites for a list of wild cells; defined in the one-time setup. */
-  const hideWildSpritesRef = useRef<((cells: { col: number; row: number }[]) => void) | null>(
-    null,
-  );
+  const hideWildSpritesRef = useRef<((cells: { col: number; row: number }[]) => void) | null>(null);
 
   useEffect(() => {
     spinRef.current = spinning;
@@ -298,9 +344,7 @@ export function SlotReels({
     tweensRef.current = [];
     reelsRef.current.forEach((r) => {
       r.stopping = false;
-      r.symbols.forEach((sym) => {
-        sym.sprite.visible = true;
-      });
+      r.symbols.forEach((sym) => setSlotSymbolVisibility(sym, true));
     });
     // Destroy active win spines
     for (const spine of activeWinSpinesRef.current) {
@@ -380,8 +424,7 @@ export function SlotReels({
     }
   }, [spinning, winLines, matrix, app]);
 
-  // Populate persistent wild-cell spine overlay whenever the matrix settles.
-  // A wild cell only animates when there are wins AND its column is flagged in expandingWild.
+  // Populate persistent expanding-wild spine overlay whenever the matrix settles.
   useEffect(() => {
     if (spinning) return;
 
@@ -390,11 +433,46 @@ export function SlotReels({
       spine.destroy();
     }
     wildActiveSpinesRef.current = [];
-    wildCellsRef.current = [];
 
     const overlay = wildOverlayRef.current;
     const hasWins = winLines.length > 0;
-    if (!overlay || !spineReadyRef.current || !hasWins) return;
+    const hasExpandColumn = expandingWild.some((x) => x !== 0);
+
+    const newWildCells: { col: number; row: number }[] = [];
+    if (hasWins && hasExpandColumn) {
+      for (let col = 0; col < matrix.length && col < REEL_COUNT; col++) {
+        if (!expandingWild[col]) continue;
+        for (let row = 0; row < VISIBLE_ROWS; row++) newWildCells.push({ col, row });
+      }
+    }
+
+    wildCellsRef.current = newWildCells;
+
+    // Hide reel strip under expanding columns (always, even before Spine preload).
+    if (loadedRef.current && reelsRef.current.length === REEL_COUNT && newWildCells.length > 0) {
+      hideWildSpritesRef.current?.(newWildCells);
+    }
+
+    // No active expanding wild slots — reveal full strips only once wins are cleared.
+    if (
+      loadedRef.current &&
+      reelsRef.current.length === REEL_COUNT &&
+      newWildCells.length === 0 &&
+      winLines.length === 0
+    ) {
+      for (const reel of reelsRef.current) {
+        for (const sym of reel.symbols) setSlotSymbolVisibility(sym, true);
+      }
+    }
+
+    if (
+      !overlay ||
+      !spineReadyRef.current ||
+      !hasWins ||
+      !hasExpandColumn ||
+      newWildCells.length === 0
+    )
+      return;
 
     const { width, height } = app.screen;
     const gridX = Math.round(width * REEL_GRID.x);
@@ -402,26 +480,21 @@ export function SlotReels({
     const gridW = Math.round(width * REEL_GRID.w);
     const gridH = Math.round(height * REEL_GRID.h);
     const cellW = gridW / REEL_COUNT;
-    const cellH = gridH / VISIBLE_ROWS;
 
-    const newWildCells: { col: number; row: number }[] = [];
     for (let col = 0; col < matrix.length; col++) {
       if (!expandingWild[col]) continue;
-      for (let row = 0; row < (matrix[col]?.length ?? 0); row++) {
-        if (matrix[col][row] !== 9) continue;
-        newWildCells.push({ col, row });
-        const wildAnim: WildAnimationName = row === 0 ? 'wild1' : row === 2 ? 'wild3' : 'wild2';
-        const spine = createWildSpine({ loop: true, animation: wildAnim, ticker: app.ticker });
-        const absX = gridX + col * cellW + cellW / 2;
-        const absY = gridY + row * cellH + cellH / 2;
-        layoutSpineInCell(spine, absX, absY, cellW, cellH);
-        overlay.addChild(spine);
-        wildActiveSpinesRef.current.push(spine);
-      }
+      const spine = createWildSpine({
+        loop: true,
+        animation: wildAnimationForRow(1),
+        ticker: app.ticker,
+      });
+      const cx = gridX + col * cellW + cellW / 2;
+      const cy = gridY + gridH / 2;
+      layoutWildSpineExpandedInColumn(spine, cx, cy, cellW, gridH);
+      overlay.addChild(spine);
+      wildActiveSpinesRef.current.push(spine);
     }
-    wildCellsRef.current = newWildCells;
-    hideWildSpritesRef.current?.(newWildCells);
-  }, [spinning, matrix, winLines, expandingWild, app]);
+  }, [spinning, matrix, winLines, expandingWild, app, sceneAssetsEpoch]);
 
   // One-time scene setup
   useEffect(() => {
@@ -472,7 +545,10 @@ export function SlotReels({
       ensureLineAssetsLoaded(),
     ])
       .then(() => {
-        if (!cancelled) spineReadyRef.current = true;
+        if (!cancelled) {
+          spineReadyRef.current = true;
+          bumpSceneAssets();
+        }
       })
       .catch(() => {});
 
@@ -517,6 +593,7 @@ export function SlotReels({
       }
 
       reelsRef.current = reels;
+      bumpSceneAssets();
     }
 
     void init();
@@ -531,12 +608,11 @@ export function SlotReels({
       }
       activeWinSpinesRef.current = [];
       for (const reel of reelsRef.current) {
-        for (const sym of reel.symbols) sym.sprite.visible = true;
+        for (const sym of reel.symbols) setSlotSymbolVisibility(sym, true);
       }
-      // Wild cells always use the spine — keep their static sprites hidden
+      // Wild expanding columns stay hidden under the Spine overlay — not only sprite.
       for (const { col, row } of wildCellsRef.current) {
-        const staticSym = reelsRef.current[col]?.symbols[row + 1];
-        if (staticSym) staticSym.sprite.visible = false;
+        setSlotSymbolVisibility(reelsRef.current[col]?.symbols[row + 1], false);
       }
       paylineLayerRef.current?.removeChildren();
     }
@@ -559,8 +635,11 @@ export function SlotReels({
 
       const newSpines: Spine[] = [];
       for (const { col, row, serverIdx } of winCellsByLineRef.current[idx] ?? []) {
-        // Wild cells already have a persistent spine in wildOverlay — no duplicate needed
-        if (serverIdx === 9) continue;
+        // Wild overlay handles expanding columns; hide strip symbol so glass etc. never shows through.
+        if (serverIdx === 9) {
+          setSlotSymbolVisibility(reelsRef.current[col]?.symbols[row + 1], false);
+          continue;
+        }
         const spine = createWinSpineForSymbol(serverIdx, app.ticker, row);
         if (!spine) continue;
         const absX = gridX + col * cellW + cellW / 2;
@@ -568,8 +647,7 @@ export function SlotReels({
         layoutSpineInCell(spine, absX, absY, cellW, cellH);
         overlay.addChild(spine);
         newSpines.push(spine);
-        const staticSym = reelsRef.current[col]?.symbols[row + 1];
-        if (staticSym) staticSym.sprite.visible = false;
+        setSlotSymbolVisibility(reelsRef.current[col]?.symbols[row + 1], false);
       }
       activeWinSpinesRef.current = newSpines;
     }
@@ -578,8 +656,7 @@ export function SlotReels({
 
     hideWildSpritesRef.current = (cells: { col: number; row: number }[]) => {
       for (const { col, row } of cells) {
-        const sym = reelsRef.current[col]?.symbols[row + 1];
-        if (sym) sym.sprite.visible = false;
+        setSlotSymbolVisibility(reelsRef.current[col]?.symbols[row + 1], false);
       }
     };
 
