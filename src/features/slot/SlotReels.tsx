@@ -381,6 +381,7 @@ export function SlotReels({
     for (const anim of paylineAnimsRef.current) anim.destroy();
     paylineAnimsRef.current = [];
     paylineLayerRef.current?.removeChildren();
+    if (paylineLayerRef.current) paylineLayerRef.current.visible = true;
     // Destroy persistent wild spines
     for (const spine of wildActiveSpinesRef.current) {
       if (spine.parent) spine.parent.removeChild(spine);
@@ -429,10 +430,11 @@ export function SlotReels({
       });
       paylineAnimsRef.current.push(anim);
 
-      // Cells whose symbols should animate while this line is shown
+      // Cells whose symbols should animate while this line is shown — skip expanding-wild columns entirely.
       const serverIdx = win.symbol;
       const cells: WinCell[] = [];
       for (let col = 0; col < win.count && col < REEL_COUNT; col++) {
+        if (expandingWild[col]) continue;
         const row = payline[col] ?? 1;
         // Skip cells where the settled matrix shows a different symbol (wild sub)
         if (symbolAlias(matrix[col]?.[row] ?? -1) !== symbolAlias(serverIdx)) continue;
@@ -445,7 +447,7 @@ export function SlotReels({
     if (paylineAnimsRef.current.length > 0) {
       activateWinLineRef.current?.(0);
     }
-  }, [spinning, winLines, matrix, app]);
+  }, [spinning, winLines, matrix, expandingWild, app]);
 
   // Populate persistent expanding-wild spine overlay whenever the matrix settles.
   useEffect(() => {
@@ -561,17 +563,15 @@ export function SlotReels({
     reelCont.y = gridY;
     app.stage.addChild(reelCont);
 
-    // Wild overlay — persistent animations for wild cells, always above the reels
     const wildOverlayCont = new Container();
     app.stage.addChild(wildOverlayCont);
     wildOverlayRef.current = wildOverlayCont;
 
-    // Win overlay sits above wild so symbol win-spines render on top
     const winOverlayCont = new Container();
     app.stage.addChild(winOverlayCont);
     winOverlayRef.current = winOverlayCont;
 
-    // Payline layer sits on top of everything — the animated line must be visible over symbols
+    // Payline above wild + win symbol spines; under big-win only.
     const paylineLayer = new Container();
     app.stage.addChild(paylineLayer);
     paylineLayerRef.current = paylineLayer;
@@ -687,10 +687,9 @@ export function SlotReels({
 
       const newSpines: Spine[] = [];
       for (const { col, row, serverIdx } of winCellsByLineRef.current[idx] ?? []) {
+        if (expandingWildColsRef.current.includes(col)) continue;
         if (serverIdx === 9) {
-          if (!expandingWildColsRef.current.includes(col)) {
-            setSlotSymbolVisibility(reelsRef.current[col]?.symbols[row + 1], false);
-          }
+          setSlotSymbolVisibility(reelsRef.current[col]?.symbols[row + 1], false);
           continue;
         }
         const spine = createWinSpineForSymbol(serverIdx, app.ticker, row);
