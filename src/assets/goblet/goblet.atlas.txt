@@ -1,0 +1,11 @@
+goblet.png
+size:400,100
+filter:Linear,Linear
+pma:true
+gob_bant
+bounds:315,2,96,83
+rotate:90
+goblet
+bounds:2,4,94,311
+offsets:2,1,97,313
+rotate:90

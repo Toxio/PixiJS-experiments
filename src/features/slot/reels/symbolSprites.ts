@@ -1,10 +1,11 @@
-import { Container, Sprite, Texture } from 'pixi.js';
+import { Container, Sprite } from 'pixi.js';
 
+import { resolveSymbolTexture } from './assets';
 import type { SlotSymbol } from './types';
 
 export function createSymbolSprite(alias: string, cw: number, ch: number): SlotSymbol {
   const container = new Container();
-  const sprite = new Sprite(Texture.from(alias));
+  const sprite = new Sprite(resolveSymbolTexture(alias));
   fitSprite(sprite, cw, ch);
   container.addChild(sprite);
   return { container, sprite };
@@ -20,7 +21,7 @@ export function fitSprite(sprite: Sprite, cw: number, ch: number): void {
 }
 
 export function updateSymbol(sym: SlotSymbol, alias: string, cw: number, ch: number): void {
-  sym.sprite.texture = Texture.from(alias);
+  sym.sprite.texture = resolveSymbolTexture(alias);
   fitSprite(sym.sprite, cw, ch);
 }
 

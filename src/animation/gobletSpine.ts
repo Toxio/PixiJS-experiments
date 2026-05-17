@@ -1,7 +1,7 @@
 import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Assets, type Ticker } from 'pixi.js';
 
-import gobletAtlasUrl from '../assets/goblet/goblet.atlas?url';
+import gobletAtlasUrl from '../assets/goblet/goblet.atlas.txt?url';
 import gobletJsonUrl from '../assets/goblet/goblet.json?url';
 import gobletPngUrl from '../assets/goblet/goblet.png?url';
 
@@ -19,6 +19,7 @@ export function registerGobletSpineAssets(): void {
   Assets.add({
     alias: GOBLET_ATLAS_ALIAS,
     src: gobletAtlasUrl,
+    loadParser: 'spineTextureAtlasLoader',
     data: {
       images: {
         'goblet.png': gobletPngUrl,

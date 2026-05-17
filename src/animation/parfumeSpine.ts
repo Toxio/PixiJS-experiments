@@ -1,7 +1,7 @@
 import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Assets, type Ticker } from 'pixi.js';
 
-import parfumeAtlasUrl from '../assets/parfume/parfume.atlas?url';
+import parfumeAtlasUrl from '../assets/parfume/parfume.atlas.txt?url';
 import parfumeJsonUrl from '../assets/parfume/parfume.json?url';
 import parfumePngUrl from '../assets/parfume/parfume.png?url';
 
@@ -19,6 +19,7 @@ export function registerParfumeSpineAssets(): void {
   Assets.add({
     alias: PARFUME_ATLAS_ALIAS,
     src: parfumeAtlasUrl,
+    loadParser: 'spineTextureAtlasLoader',
     data: {
       images: {
         'parfume.png': parfumePngUrl,

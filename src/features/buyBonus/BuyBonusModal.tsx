@@ -48,13 +48,7 @@ export function BuyBonusModal({
   return (
     <div className="bb-backdrop" onClick={onClose}>
       <div className="bb-modal" onClick={(e) => e.stopPropagation()}>
-
-        <button
-          className="bb-close-btn"
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-        >
+        <button className="bb-close-btn" type="button" onClick={onClose} aria-label="Close">
           <img src={exitImg} alt="Close" />
         </button>
 

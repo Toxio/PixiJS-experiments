@@ -1,7 +1,7 @@
 import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Assets, type Ticker } from 'pixi.js';
 
-import roseAtlasUrl from '../assets/rose/rose.atlas?url';
+import roseAtlasUrl from '../assets/rose/rose.atlas.txt?url';
 import roseJsonUrl from '../assets/rose/rose.json?url';
 import rosePngUrl from '../assets/rose/rose.png?url';
 
@@ -19,6 +19,7 @@ export function registerRoseSpineAssets(): void {
   Assets.add({
     alias: ROSE_ATLAS_ALIAS,
     src: roseAtlasUrl,
+    loadParser: 'spineTextureAtlasLoader',
     data: {
       images: {
         'rose.png': rosePngUrl,

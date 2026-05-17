@@ -1,7 +1,7 @@
 import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Assets, type Ticker } from 'pixi.js';
 
-import starAtlasUrl from '../assets/star/star.atlas?url';
+import starAtlasUrl from '../assets/star/star.atlas.txt?url';
 import starJsonUrl from '../assets/star/star.json?url';
 import starPngUrl from '../assets/star/star.png?url';
 
@@ -18,6 +18,7 @@ export function registerStarSpineAssets(): void {
   Assets.add({
     alias: STAR_ATLAS_ALIAS,
     src: starAtlasUrl,
+    loadParser: 'spineTextureAtlasLoader',
     data: {
       images: {
         'star.png': starPngUrl,

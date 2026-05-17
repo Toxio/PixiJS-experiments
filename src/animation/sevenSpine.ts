@@ -1,7 +1,7 @@
 import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Assets, type Ticker } from 'pixi.js';
 
-import sevenAtlasUrl from '../assets/seven/seven.atlas?url';
+import sevenAtlasUrl from '../assets/seven/seven.atlas.txt?url';
 import sevenJsonUrl from '../assets/seven/seven.json?url';
 import sevenPngUrl from '../assets/seven/seven.png?url';
 
@@ -18,6 +18,7 @@ export function registerSevenSpineAssets(): void {
   Assets.add({
     alias: SEVEN_ATLAS_ALIAS,
     src: sevenAtlasUrl,
+    loadParser: 'spineTextureAtlasLoader',
     data: {
       images: {
         'seven.png': sevenPngUrl,

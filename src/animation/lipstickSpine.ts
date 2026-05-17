@@ -1,7 +1,7 @@
 import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Assets, type Ticker } from 'pixi.js';
 
-import lipstickAtlasUrl from '../assets/lipstick/lipstick.atlas?url';
+import lipstickAtlasUrl from '../assets/lipstick/lipstick.atlas.txt?url';
 import lipstickJsonUrl from '../assets/lipstick/lipstick.json?url';
 import lipstickPngUrl from '../assets/lipstick/lipstick.png?url';
 
@@ -19,6 +19,7 @@ export function registerLipstickSpineAssets(): void {
   Assets.add({
     alias: LIPSTICK_ATLAS_ALIAS,
     src: lipstickAtlasUrl,
+    loadParser: 'spineTextureAtlasLoader',
     data: {
       images: {
         'lipstick.png': lipstickPngUrl,

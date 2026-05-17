@@ -14,7 +14,23 @@ function wl(symbol: number, line: number, count: number, winAmount: number): Win
   return { symbol, line, count, winAmount };
 }
 
-// ─── Presets ─────────────────────────────────────────────────────────────────
+/** Payline 1 = middle row — five matches so each symbol’s win-Spine can play. */
+function winAnimMidRowFive(symbol: number, winAmount: number): ForceSpinPreset {
+  return {
+    matrix: buildMatrix([
+      [7, symbol, 4],
+      [6, symbol, 3],
+      [11, symbol, 5],
+      [2, symbol, 7],
+      [4, symbol, 6],
+    ]),
+    winLines: [wl(symbol, 1, 5, winAmount)],
+    winAmount,
+  };
+}
+
+// ─── Win-Spine preview (built after `TestPreset`; appended to TEST_PRESETS) ──
+
 export interface TestPreset {
   id: string;
   label: string;
@@ -24,43 +40,112 @@ export interface TestPreset {
   preset: ForceSpinPreset;
 }
 
-export const TEST_PRESETS: TestPreset[] = [
+const WIN_SPINE_ANIM_PRESETS: TestPreset[] = [
   {
-    id: 'seven-mid',
-    label: '5× Seven',
-    subtitle: 'Line 1 · Middle row',
+    id: 'win-anim-seven',
+    label: 'Win anim · Seven',
+    subtitle: 'Spine · Line 1 · ×5',
     badge: '7️⃣×5',
     badgeColor: '#ff4d4d',
+    preset: winAnimMidRowFive(1, 100),
+  },
+  {
+    id: 'win-anim-lips',
+    label: 'Win anim · Lips',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '💋×5',
+    badgeColor: '#ff6b9d',
+    preset: winAnimMidRowFive(2, 95),
+  },
+  {
+    id: 'win-anim-parfume',
+    label: 'Win anim · Parfume',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '🌸×5',
+    badgeColor: '#e040fb',
+    preset: winAnimMidRowFive(3, 92),
+  },
+  {
+    id: 'win-anim-rose',
+    label: 'Win anim · Rose',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '🌹×5',
+    badgeColor: '#ff5252',
+    preset: winAnimMidRowFive(4, 88),
+  },
+  {
+    id: 'win-anim-glass',
+    label: 'Win anim · Glass',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '🥂×5',
+    badgeColor: '#80dfff',
+    preset: winAnimMidRowFive(5, 80),
+  },
+  {
+    id: 'win-anim-lipstick',
+    label: 'Win anim · Lipstick',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '💄×5',
+    badgeColor: '#ff4081',
+    preset: winAnimMidRowFive(6, 85),
+  },
+  {
+    id: 'win-anim-goblet',
+    label: 'Win anim · Goblet',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '🏆×5',
+    badgeColor: '#ffa040',
+    preset: winAnimMidRowFive(7, 82),
+  },
+  {
+    id: 'win-anim-heels',
+    label: 'Win anim · Heels',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '👠×5',
+    badgeColor: '#ff80ab',
+    preset: winAnimMidRowFive(8, 90),
+  },
+  {
+    id: 'win-anim-wild',
+    label: 'Win anim · Wild',
+    subtitle: 'Spine · Line 1 · ×5 · expand',
+    badge: '👸×5',
+    badgeColor: '#c084fc',
     preset: {
       matrix: buildMatrix([
         [7, 1, 4],
-        [6, 1, 3],
-        [11, 1, 5],
-        [2, 1, 7],
-        [4, 1, 6],
+        [9, 2, 3],
+        [11, 9, 5],
+        [2, 7, 9],
+        [4, 5, 6],
       ]),
-      winLines: [wl(1, 1, 5, 100)],
-      winAmount: 100,
+      winLines: [wl(9, 1, 5, 120)],
+      winAmount: 120,
+      expandingWild: [0, 9, 9, 9, 0],
     },
   },
   {
-    id: 'glass-mid',
-    label: '5× Glass',
-    subtitle: 'Line 1 · Middle row',
-    badge: '🥂×5',
-    badgeColor: '#80dfff',
-    preset: {
-      matrix: buildMatrix([
-        [11, 5, 2],
-        [1, 5, 4],
-        [6, 5, 7],
-        [3, 5, 11],
-        [2, 5, 1],
-      ]),
-      winLines: [wl(5, 1, 5, 80)],
-      winAmount: 80,
-    },
+    id: 'win-anim-scatter',
+    label: 'Win anim · Scatter',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '📦×5',
+    badgeColor: '#fbbf24',
+    preset: winAnimMidRowFive(10, 150),
   },
+  {
+    id: 'win-anim-star',
+    label: 'Win anim · Star',
+    subtitle: 'Spine · Line 1 · ×5',
+    badge: '⭐×5',
+    badgeColor: '#ffe066',
+    preset: winAnimMidRowFive(11, 40),
+  },
+];
+
+// ─── Presets ─────────────────────────────────────────────────────────────────
+
+export const TEST_PRESETS: TestPreset[] = [
+  ...WIN_SPINE_ANIM_PRESETS,
   {
     id: 'star-bot',
     label: '5× Star',
@@ -211,25 +296,6 @@ export const TEST_PRESETS: TestPreset[] = [
     },
   },
   {
-    id: 'wild-mid',
-    label: '5× Wild',
-    subtitle: 'Line 1 · Middle row',
-    badge: '👸×5',
-    badgeColor: '#c084fc',
-    preset: {
-      matrix: buildMatrix([
-        [7, 1, 4],
-        [9, 2, 3],
-        [11, 9, 5],
-        [2, 7, 9],
-        [4, 5, 6],
-      ]),
-      winLines: [wl(9, 1, 5, 120)],
-      winAmount: 120,
-      expandingWild: [0, 9, 9, 9, 0],
-    },
-  },
-  {
     id: 'seven-3-wild-col2',
     label: '3× Seven + Wild',
     subtitle: 'Line 1 · Wild in 2nd column',
@@ -247,42 +313,6 @@ export const TEST_PRESETS: TestPreset[] = [
       winLines: [wl(1, 1, 3, 15)],
       winAmount: 15,
       expandingWild: [0, 9, 0, 0, 0],
-    },
-  },
-  {
-    id: 'scatter-mid',
-    label: '5× Scatter',
-    subtitle: 'Line 1 · Middle row',
-    badge: '📦×5',
-    badgeColor: '#fbbf24',
-    preset: {
-      matrix: buildMatrix([
-        [7, 10, 4],
-        [6, 10, 3],
-        [11, 10, 5],
-        [2, 10, 7],
-        [4, 10, 6],
-      ]),
-      winLines: [wl(10, 1, 5, 150)],
-      winAmount: 150,
-    },
-  },
-  {
-    id: 'heels-mid',
-    label: '5× Heels',
-    subtitle: 'Line 1 · Middle row',
-    badge: '👠×5',
-    badgeColor: '#ff80ab',
-    preset: {
-      matrix: buildMatrix([
-        [7, 8, 4],
-        [6, 8, 3],
-        [11, 8, 5],
-        [2, 8, 7],
-        [4, 8, 6],
-      ]),
-      winLines: [wl(8, 1, 5, 90)],
-      winAmount: 90,
     },
   },
   {

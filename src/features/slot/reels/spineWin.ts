@@ -1,6 +1,7 @@
 import { Spine } from '@esotericsoftware/spine-pixi-v8';
 import type { Ticker } from 'pixi.js';
 
+import { applySmoothWinLoop } from '../../../animation/spineSmoothLoop';
 import { createGlassSpine } from '../../../animation/glassSpine';
 import { createGobletSpine } from '../../../animation/gobletSpine';
 import { createHeelsSpine } from '../../../animation/heelsSpine';
@@ -24,6 +25,11 @@ export function wildAnimationForRow(row: number): WildAnimationName {
   return row === 0 ? 'wild1' : row === 2 ? 'wild3' : 'wild2';
 }
 
+function winSpineSmooth(spine: Spine, animationName: string): Spine {
+  applySmoothWinLoop(spine, animationName);
+  return spine;
+}
+
 /** Win Spine for server symbol index (1-based). `row` required for wild (9) → wild1/2/3. */
 export function createWinSpineForSymbol(
   serverIdx: number,
@@ -32,29 +38,30 @@ export function createWinSpineForSymbol(
 ): Spine | null {
   switch (serverIdx) {
     case 1:
-      return createSevenSpine({ loop: true, ticker });
+      return winSpineSmooth(createSevenSpine({ loop: false, ticker }), 'win');
     case 2:
-      return createLipsSpine({ loop: true, animation: 'win', ticker });
+      return winSpineSmooth(createLipsSpine({ loop: false, animation: 'win', ticker }), 'win');
     case 3:
-      return createParfumeSpine({ loop: true, ticker });
+      return winSpineSmooth(createParfumeSpine({ loop: false, ticker }), 'win');
     case 4:
-      return createRoseSpine({ loop: true, ticker });
+      return winSpineSmooth(createRoseSpine({ loop: false, ticker }), 'win');
     case 5:
-      return createGlassSpine({ loop: true, animation: 'win', ticker });
+      return winSpineSmooth(createGlassSpine({ loop: false, animation: 'win', ticker }), 'win');
     case 6:
-      return createLipstickSpine({ loop: true, ticker });
+      return winSpineSmooth(createLipstickSpine({ loop: false, ticker }), 'win');
     case 7:
-      return createGobletSpine({ loop: true, ticker });
+      return winSpineSmooth(createGobletSpine({ loop: false, ticker }), 'win');
     case 8:
-      return createHeelsSpine({ loop: true, animation: 'win', ticker });
+      return winSpineSmooth(createHeelsSpine({ loop: false, animation: 'win', ticker }), 'win');
     case 9: {
       const r = row ?? 1;
-      return createWildSpine({ loop: true, animation: wildAnimationForRow(r), ticker });
+      const anim = wildAnimationForRow(r);
+      return winSpineSmooth(createWildSpine({ loop: false, animation: anim, ticker }), anim);
     }
     case 10:
-      return createScatterSpine({ loop: true, animation: 'win', ticker });
+      return winSpineSmooth(createScatterSpine({ loop: false, animation: 'win', ticker }), 'win');
     case 11:
-      return createStarSpine({ loop: true, animation: 'win', ticker });
+      return winSpineSmooth(createStarSpine({ loop: false, animation: 'win', ticker }), 'win');
     default:
       return null;
   }

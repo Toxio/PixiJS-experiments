@@ -1,7 +1,7 @@
 import { SetupPoseBoundsProvider, Spine } from '@esotericsoftware/spine-pixi-v8';
 import { Assets, type Ticker } from 'pixi.js';
 
-import wildAtlasUrl from '../assets/wild/wild.atlas?url';
+import wildAtlasUrl from '../assets/wild/wild.atlas.txt?url';
 import wildJsonUrl from '../assets/wild/wild.json?url';
 import wildPngUrl from '../assets/wild/wild.png?url';
 
@@ -18,6 +18,7 @@ export function registerWildSpineAssets(): void {
   Assets.add({
     alias: WILD_ATLAS_ALIAS,
     src: wildAtlasUrl,
+    loadParser: 'spineTextureAtlasLoader',
     data: {
       images: {
         'wild.png': wildPngUrl,

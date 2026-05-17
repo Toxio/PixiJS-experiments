@@ -31,9 +31,10 @@ import { ensureRoseSpineLoaded } from '../../../animation/roseSpine';
 import { ensureSevenSpineLoaded } from '../../../animation/sevenSpine';
 import { ensureScatterSpineLoaded } from '../../../animation/scatterSpine';
 import { ensureStarSpineLoaded } from '../../../animation/starSpine';
+import { applySmoothWinLoop } from '../../../animation/spineSmoothLoop';
 import { createWildSpine, ensureWildSpineLoaded } from '../../../animation/wildSpine';
 import { getPaylineForLineId } from '../../../constant/paylines';
-import { ALL_ASSETS, randomAlias, symbolAlias } from './assets';
+import { ALL_ASSETS, ensureHeelsReelSymbolTexture, randomAlias, symbolAlias } from './assets';
 import { LINE_DELAY_MS, REEL_COUNT, REEL_SIZE, SPEED, SPIN_SPEED } from './constants';
 import { backout, lerp } from './easing';
 import { getSlotGridMetrics } from './grid';
@@ -143,6 +144,22 @@ export function SlotReels({
     const layer = paylineLayerRef.current;
     if (!layer) return;
 
+    const hasExpandColumn = expandingWild.some((x) => x !== 0);
+    const wildCols: number[] = [];
+    if (hasExpandColumn) {
+      for (let col = 0; col < matrix.length && col < REEL_COUNT; col++) {
+        if (expandingWild[col]) wildCols.push(col);
+      }
+    }
+    expandingWildColsRef.current = wildCols;
+    if (loadedRef.current && reelsRef.current.length === REEL_COUNT && wildCols.length > 0) {
+      for (const col of wildCols) {
+        const reel = reelsRef.current[col];
+        if (!reel) continue;
+        for (const sym of reel.symbols) setSlotSymbolVisibility(sym, false);
+      }
+    }
+
     layer.removeChildren();
     for (const a of paylineAnimsRef.current) a.destroy();
     paylineAnimsRef.current = [];
@@ -228,11 +245,13 @@ export function SlotReels({
 
     for (let col = 0; col < matrix.length; col++) {
       if (!expandingWild[col]) continue;
+      const anim = wildAnimationForRow(1);
       const spine = createWildSpine({
-        loop: true,
-        animation: wildAnimationForRow(1),
+        loop: false,
+        animation: anim,
         ticker: app.ticker,
       });
+      applySmoothWinLoop(spine, anim);
       const cx = gridX + col * cellW + cellW / 2;
       const cy = gridY + gridH / 2;
       layoutWildSpineExpandedInColumn(spine, cx, cy, cellW, gridH);
@@ -298,6 +317,8 @@ export function SlotReels({
     app.stage.addChild(bigWinLayer);
     bigWinLayerRef.current = bigWinLayer;
 
+    let reelBgSprite: Sprite | null = null;
+
     let cancelled = false;
 
     Promise.all([
@@ -324,6 +345,7 @@ export function SlotReels({
       .catch(() => {});
 
     async function init() {
+      await ensureHeelsReelSymbolTexture();
       await Assets.load(ALL_ASSETS);
       if (cancelled) return;
 
@@ -333,6 +355,7 @@ export function SlotReels({
       bgSprite.width = width;
       bgSprite.height = height;
       app.stage.addChildAt(bgSprite, 0);
+      reelBgSprite = bgSprite;
 
       const reels: Reel[] = [];
 
@@ -515,7 +538,7 @@ export function SlotReels({
           activateWinLine(nextIdx);
         } else if (elapsed >= lineShowMs && !paylineInDelayRef.current) {
           paylineInDelayRef.current = true;
-          deactivateCurrentLine();
+          paylineLayerRef.current?.removeChildren();
         }
       }
     };
@@ -547,6 +570,8 @@ export function SlotReels({
       winOverlayCont.destroy({ children: true });
       paylineLayer.destroy({ children: true });
       bigWinLayer.destroy({ children: true });
+      reelBgSprite?.destroy();
+      reelBgSprite = null;
       reelCont.destroy({ children: true });
       if (reelCont.parent) reelCont.parent.removeChild(reelCont);
     };

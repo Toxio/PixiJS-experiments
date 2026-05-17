@@ -112,6 +112,8 @@ function extractSpinMatrixFromGameAction(data: Record<string, unknown>): number[
 
 export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): SlotsHubSignalRState {
   const connRef = useRef<HubConnection | null>(null);
+  /** Latest grid result for the in-flight spin — read in handleSpinComplete without nested setState. */
+  const targetMatrixRef = useRef<number[][] | null>(null);
 
   const [status, setStatus] = useState<ConnStatus>('connecting');
   const [balance, setBalance] = useState(0);
@@ -125,6 +127,10 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
   const [winLines, setWinLines] = useState<WinLine[]>([]);
   const [expandingWild, setExpandingWild] = useState<number[]>([0, 0, 0, 0, 0]);
   const [spinOdd, setSpinOdd] = useState<number | null>(null);
+
+  useEffect(() => {
+    targetMatrixRef.current = targetMatrix;
+  }, [targetMatrix]);
 
   useEffect(() => {
     const connection = createSlotsHubConnection();
@@ -246,11 +252,10 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
   );
 
   const handleSpinComplete = useCallback(() => {
-    setTargetMatrix((prev) => {
-      if (prev) setMatrix(prev);
-      return null;
-    });
+    const committed = targetMatrixRef.current;
+    if (committed) setMatrix(committed);
     setSpinning(false);
+    setTargetMatrix(null);
   }, []);
 
   return {
