@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { createSlotsHubConnection, DEFAULT_SLOTS_INITIAL_STATE } from '../api/slotsHubConnection';
+import { canAffordStake, spendableBalanceForStake } from '../features/slot/stakeBalance';
 
 export type ConnStatus = 'connecting' | 'ready' | 'error';
 
@@ -27,6 +28,8 @@ export interface WinLine {
 export interface UseSlotsHubSignalROptions {
   /** Used for the safety timeout when the API is slow (matches reel speed). */
   spinSpeed: 1 | 2 | 3;
+  /** Called when spin is blocked due to insufficient balance (checks run only before spin). */
+  onInsufficientFunds?: () => void;
 }
 
 export interface ForceSpinPreset {
@@ -110,7 +113,10 @@ function extractSpinMatrixFromGameAction(data: Record<string, unknown>): number[
   return matrixFromRecord(inner) ?? matrixFromRecord(payload) ?? matrixFromRecord(data);
 }
 
-export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): SlotsHubSignalRState {
+export function useSlotsHubSignalR({
+  spinSpeed,
+  onInsufficientFunds,
+}: UseSlotsHubSignalROptions): SlotsHubSignalRState {
   const connRef = useRef<HubConnection | null>(null);
   /** Latest grid result for the in-flight spin — read in handleSpinComplete without nested setState. */
   const targetMatrixRef = useRef<number[][] | null>(null);
@@ -120,7 +126,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
   const [currency, setCurrency] = useState('USD');
   const [matrix, setMatrix] = useState<number[][]>(defaultMatrix());
   const [quickBets, setQuickBets] = useState<number[]>([1, 2, 5, 10]);
-  const [betAmount, setBetAmount] = useState(2);
+  const [betAmount, setBetAmountState] = useState(2);
   const [spinning, setSpinning] = useState(false);
   const [targetMatrix, setTargetMatrix] = useState<number[][] | null>(null);
   const [winAmount, setWinAmount] = useState<number | null>(null);
@@ -132,19 +138,24 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     targetMatrixRef.current = targetMatrix;
   }, [targetMatrix]);
 
+  const setBetAmount = useCallback((value: SetStateAction<number>) => {
+    setBetAmountState(value);
+  }, []);
+
   useEffect(() => {
     const connection = createSlotsHubConnection();
 
     connection.on('InitialStateResult', (data: Record<string, unknown>) => {
       console.log('InitialStateResult', data);
-      setBalance(Number(data.Balance ?? data.balance ?? 0));
+      const bal = Number(data.Balance ?? data.balance ?? 0);
+      setBalance(bal);
       setCurrency(String(data.CurrencyCode ?? data.currencyCode ?? 'USD'));
       const matRaw = (data.Matrix ?? data.matrix) as unknown;
       if (isNumberMatrix(matRaw)) setMatrix(normalizeSpinMatrix(matRaw));
       const qb = (data.QuickBets ?? data.quickBets) as number[] | undefined;
       if (qb?.length) setQuickBets(qb);
       const dba = Number(data.DefaultBetAmount ?? data.defaultBetAmount ?? 0);
-      if (dba) setBetAmount(dba);
+      if (dba) setBetAmountState(dba);
       setStatus('ready');
     });
 
@@ -215,6 +226,11 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
 
   const spin = useCallback(async () => {
     if (!connRef.current || spinning || status !== 'ready') return;
+    const stakePool = spendableBalanceForStake(balance, winAmount);
+    if (!canAffordStake(betAmount, stakePool)) {
+      onInsufficientFunds?.();
+      return;
+    }
     setSpinning(true);
     setWinAmount(null);
     setWinLines([]);
@@ -229,11 +245,16 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
     } catch {
       setSpinning(false);
     }
-  }, [spinning, status, betAmount]);
+  }, [spinning, status, betAmount, balance, winAmount, onInsufficientFunds]);
 
   const forceSpin = useCallback(
     (preset: ForceSpinPreset) => {
       if (spinning) return;
+      const stakePool = spendableBalanceForStake(balance, winAmount);
+      if (!canAffordStake(betAmount, stakePool)) {
+        onInsufficientFunds?.();
+        return;
+      }
       setSpinning(true);
       setWinAmount(null);
       setWinLines([]);
@@ -248,7 +269,7 @@ export function useSlotsHubSignalR({ spinSpeed }: UseSlotsHubSignalROptions): Sl
         setSpinOdd(preset.odd !== undefined && Number.isFinite(preset.odd) ? preset.odd : null);
       }, 0);
     },
-    [spinning],
+    [spinning, betAmount, balance, winAmount, onInsufficientFunds],
   );
 
   const handleSpinComplete = useCallback(() => {

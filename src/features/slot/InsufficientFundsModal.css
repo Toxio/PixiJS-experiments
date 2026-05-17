@@ -1,0 +1,78 @@
+.smp-inf-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  animation: smp-inf-in 0.2s ease;
+}
+
+@keyframes smp-inf-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.smp-inf-dialog {
+  width: min(400px, 100%);
+  padding: 24px 28px 22px;
+  background: rgba(18, 12, 8, 0.96);
+  border: 1px solid rgba(245, 166, 35, 0.45);
+  border-radius: 16px;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.smp-inf-title {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 210, 140, 0.95);
+}
+
+.smp-inf-text {
+  margin: 0 0 22px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.smp-inf-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.smp-inf-close {
+  padding: 10px 22px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8a4a09 0%, #f5a623 48%, #8a4a09 100%);
+  box-shadow: 0 4px 14px rgba(245, 166, 35, 0.35);
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
+}
+
+.smp-inf-close:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(245, 166, 35, 0.45);
+}
+
+.smp-inf-close:active {
+  transform: translateY(0);
+}

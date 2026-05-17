@@ -1,9 +1,12 @@
 import { Application } from '@pixi/react';
-import { useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useSlotsHubSignalR } from '../../hooks/useSlotsHubSignalR';
-import { SlotBetRow } from './SlotBetRow';
+import { canAffordStake, spendableBalanceForStake } from './stakeBalance';
+import { exitToLobby, getExitLobbyHref } from '../../utils/getExitLobbyUrl';
 import { BalanceRow } from './BalanceRow';
+import { InsufficientFundsModal } from './InsufficientFundsModal';
+import { SlotBetRow } from './SlotBetRow';
 import { SlotReels } from './reels';
 import { BuyBonusModal } from '../buyBonus/BuyBonusModal';
 import { TestModal } from './test/TestModal';
@@ -12,6 +15,9 @@ export function SlotMachinePixi() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [buyBonusOpen, setBuyBonusOpen] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
+  const [insufficientModalOpen, setInsufficientModalOpen] = useState(false);
+
+  const showInsufficientFunds = useCallback(() => setInsufficientModalOpen(true), []);
 
   const {
     status,
@@ -30,11 +36,55 @@ export function SlotMachinePixi() {
     spin,
     forceSpin,
     handleSpinComplete,
-  } = useSlotsHubSignalR({ spinSpeed: 2 });
+  } = useSlotsHubSignalR({
+    spinSpeed: 2,
+    onInsufficientFunds: showInsufficientFunds,
+  });
+
+  const stakePool = spendableBalanceForStake(balance, winAmount);
+  const cannotAffordBet = !canAffordStake(betAmount, stakePool);
+
+  const handleSpinClick = useCallback(() => {
+    if (cannotAffordBet) {
+      showInsufficientFunds();
+      return;
+    }
+    void spin();
+  }, [cannotAffordBet, showInsufficientFunds, spin]);
+
+  const handleTestPanelClick = useCallback(() => {
+    if (cannotAffordBet) {
+      showInsufficientFunds();
+      return;
+    }
+    setTestOpen(true);
+  }, [cannotAffordBet, showInsufficientFunds]);
+
+  const lobbyButtonTitle = useMemo(
+    () =>
+      getExitLobbyHref()
+        ? 'Вернуться в лобби (exitURL)'
+        : 'Параметр exitURL не найден — будет выполнен переход назад по истории браузера.',
+    [],
+  );
+
+  const handleLobbyClick = useCallback(() => {
+    exitToLobby();
+  }, []);
 
   return (
     <div className="smp-wrapper">
-      <BalanceRow balance={balance} currency={currency} winAmount={winAmount} />
+      <div className="smp-top-bar">
+        <BalanceRow balance={balance} currency={currency} winAmount={winAmount} />
+        <button
+          type="button"
+          className="smp-lobby-btn"
+          onClick={handleLobbyClick}
+          title={lobbyButtonTitle}
+        >
+          Назад в лобби
+        </button>
+      </div>
 
       <div ref={containerRef} className="smp-canvas">
         {status === 'connecting' && <div className="smp-overlay">Connecting…</div>}
@@ -58,6 +108,7 @@ export function SlotMachinePixi() {
         <SlotBetRow
           quickBets={quickBets}
           betAmount={betAmount}
+          stakingBalance={stakePool}
           disabled={spinning}
           onBetChange={setBetAmount}
         />
@@ -73,10 +124,15 @@ export function SlotMachinePixi() {
           </button>
 
           <button
-            className="smp-spin-btn"
+            className={`smp-spin-btn${cannotAffordBet ? ' smp-spin-btn--insufficient' : ''}`}
             type="button"
-            onClick={spin}
+            onClick={handleSpinClick}
             disabled={spinning || status !== 'ready'}
+            title={
+              cannotAffordBet && status === 'ready' && !spinning
+                ? 'Недостаточно средств на балансе для этой ставки'
+                : undefined
+            }
           >
             {status === 'connecting'
               ? 'Connecting…'
@@ -90,14 +146,23 @@ export function SlotMachinePixi() {
           <button
             className="smp-test-btn"
             type="button"
-            onClick={() => setTestOpen(true)}
+            onClick={handleTestPanelClick}
             disabled={spinning}
-            title="Open test preset panel"
+            title={
+              cannotAffordBet && !spinning
+                ? 'Недостаточно средств на балансе'
+                : 'Open test preset panel'
+            }
           >
             🧪
           </button>
         </div>
       </div>
+
+      <InsufficientFundsModal
+        open={insufficientModalOpen}
+        onClose={() => setInsufficientModalOpen(false)}
+      />
 
       {buyBonusOpen && (
         <BuyBonusModal

@@ -159,11 +159,14 @@ export function SlotReels({
       }
     }
     expandingWildColsRef.current = wildCols;
+    /** Hide base reel sprites in expanding-wild columns only after Spine preload; else cells stay visibly empty. */
     if (loadedRef.current && reelsRef.current.length === REEL_COUNT && wildCols.length > 0) {
-      for (const col of wildCols) {
-        const reel = reelsRef.current[col];
-        if (!reel) continue;
-        for (const sym of reel.symbols) setSlotSymbolVisibility(sym, false);
+      if (spineReadyRef.current) {
+        for (const col of wildCols) {
+          const reel = reelsRef.current[col];
+          if (!reel) continue;
+          for (const sym of reel.symbols) setSlotSymbolVisibility(sym, false);
+        }
       }
     }
 
@@ -229,10 +232,6 @@ export function SlotReels({
 
     expandingWildColsRef.current = wildCols;
 
-    if (loadedRef.current && reelsRef.current.length === REEL_COUNT && wildCols.length > 0) {
-      hideWildStripColumnsRef.current?.(wildCols);
-    }
-
     if (
       loadedRef.current &&
       reelsRef.current.length === REEL_COUNT &&
@@ -249,6 +248,8 @@ export function SlotReels({
 
     const { width, height } = app.screen;
     const { gridX, gridY, gridH, cellW } = getSlotGridMetrics(width, height);
+
+    hideWildStripColumnsRef.current?.(wildCols);
 
     for (let col = 0; col < matrix.length; col++) {
       if (!expandingWild[col]) continue;
