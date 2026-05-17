@@ -7,7 +7,7 @@ import lipsImg from '../../../assets/symbols/images/lips.png';
 import lipstickImg from '../../../assets/symbols/images/lipstick.png';
 import parfumeImg from '../../../assets/symbols/images/parfume.png';
 import roseImg from '../../../assets/symbols/images/rose.png';
-import scatterImg from '../../../assets/scatter/scatter.png';
+import scatterImg from '../../../assets/scatter/scatter_box.png';
 import sevenImg from '../../../assets/symbols/images/seven.png';
 import starImg from '../../../assets/symbols/images/star.png';
 import wildImg from '../../../assets/wild/wild-icon.png';

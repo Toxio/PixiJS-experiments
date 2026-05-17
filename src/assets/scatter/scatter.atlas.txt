@@ -1,7 +1,0 @@
-scatter.png
-size:300,380
-filter:Linear,Linear
-pma:true
-scatter
-bounds:2,2,296,376
-offsets:1,1,298,378
