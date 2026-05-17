@@ -91,6 +91,26 @@ export function layoutSpineInCell(
   spine.position.set(absX - (lb.x + lb.width / 2) * s, absY - (lb.y + lb.height / 2) * s);
 }
 
+/** Background `symbol_fx` only — larger fit than {@link layoutSpineInCell} so glow extends past the symbol. */
+const SYMBOL_FX_CELL_SCALE_MUL = 1.8;
+
+export function layoutSymbolFxInCell(
+  spine: Spine,
+  absX: number,
+  absY: number,
+  cellW: number,
+  cellH: number,
+): void {
+  spine.update(0);
+  const lb = spine.getLocalBounds();
+  const bw = lb.width > 0 ? lb.width : 1;
+  const bh = lb.height > 0 ? lb.height : 1;
+  const pad = SPINE_CELL_SCALE * SYMBOL_FX_CELL_SCALE_MUL;
+  const s = Math.min((cellW * pad) / bw, (cellH * pad) / bh);
+  spine.scale.set(s);
+  spine.position.set(absX - (lb.x + lb.width / 2) * s, absY - (lb.y + lb.height / 2) * s);
+}
+
 export function layoutWildSpineExpandedInColumn(
   spine: Spine,
   absXCenter: number,

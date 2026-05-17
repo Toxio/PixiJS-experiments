@@ -30,7 +30,9 @@ import { ensureParfumeSpineLoaded } from '../../../animation/parfumeSpine';
 import { ensureRoseSpineLoaded } from '../../../animation/roseSpine';
 import { ensureSevenSpineLoaded } from '../../../animation/sevenSpine';
 import { ensureScatterSpineLoaded } from '../../../animation/scatterSpine';
+import { applySmoothWinLoop } from '../../../animation/spineSmoothLoop';
 import { ensureStarSpineLoaded } from '../../../animation/starSpine';
+import { createSymbolFxSpine, ensureSymbolFxSpineLoaded } from '../../../animation/symbolFxSpine';
 import { createWildSpineShowThenIdle, ensureWildSpineLoaded } from '../../../animation/wildSpine';
 import { getPaylineForLineId } from '../../../constant/paylines';
 import {
@@ -46,6 +48,7 @@ import { getSlotGridMetrics } from './grid';
 import {
   createWinSpineForSymbol,
   layoutSpineInCell,
+  layoutSymbolFxInCell,
   layoutWildSpineExpandedInColumn,
   wildAnimationForRow,
 } from './spineWin';
@@ -334,6 +337,7 @@ export function SlotReels({
       ensureHeelsSpineLoaded(),
       ensureWildSpineLoaded(),
       ensureScatterSpineLoaded(),
+      ensureSymbolFxSpineLoaded(),
       ensureBigWinSpineLoaded(),
       ensureLineAssetsLoaded(),
     ])
@@ -426,13 +430,19 @@ export function SlotReels({
           setSlotSymbolVisibility(reelsRef.current[col]?.symbols[row + 1], false);
           continue;
         }
-        const spine = createWinSpineForSymbol(serverIdx, app.ticker, row);
-        if (!spine) continue;
         const absX = gridX + col * cellW + cellW / 2;
         const absY = gridY + row * cellH + cellH / 2;
+
+        const spine = createWinSpineForSymbol(serverIdx, app.ticker, row);
+        if (!spine) continue;
+
+        const fxSpine = createSymbolFxSpine({ loop: false, animation: 'win', ticker: app.ticker });
+        applySmoothWinLoop(fxSpine, 'win');
+        layoutSymbolFxInCell(fxSpine, absX, absY, cellW, cellH);
         layoutSpineInCell(spine, absX, absY, cellW, cellH);
+        overlay.addChild(fxSpine);
         overlay.addChild(spine);
-        newSpines.push(spine);
+        newSpines.push(fxSpine, spine);
         setSlotSymbolVisibility(reelsRef.current[col]?.symbols[row + 1], false);
       }
       activeWinSpinesRef.current = newSpines;
