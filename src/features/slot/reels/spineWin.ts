@@ -6,7 +6,10 @@ import { createGlassSpine } from '../../../animation/glassSpine';
 import { createGobletSpine } from '../../../animation/gobletSpine';
 import { createHeelsSpine } from '../../../animation/heelsSpine';
 import { createScatterSpine } from '../../../animation/scatterSpine';
-import { createWildSpine, type WildAnimationName } from '../../../animation/wildSpine';
+import {
+  createWildSpineShowThenIdle,
+  type WildShowAnimationName,
+} from '../../../animation/wildSpine';
 import { createLipsSpine } from '../../../animation/lipsSpine';
 import { createLipstickSpine } from '../../../animation/lipstickSpine';
 import { createParfumeSpine } from '../../../animation/parfumeSpine';
@@ -16,12 +19,16 @@ import { createStarSpine } from '../../../animation/starSpine';
 
 const SPINE_CELL_SCALE = 0.82;
 
-const EXPANDED_WILD_SIDE_PAD_FRAC = 0.048;
-const EXPANDED_WILD_HEIGHT_MUL = 1.22;
-const EXPANDED_WILD_SHIFT_DOWN_FRAC = 0.09;
-const EXPANDED_WILD_SHIFT_LEFT_FRAC = 0.1;
+const EXPANDED_WILD_SIDE_PAD_FRAC = 0.07;
+const EXPANDED_WILD_HEIGHT_MUL = 1.12;
+const EXPANDED_WILD_COLUMN_H_FRAC = 0.92;
+/** Applied after width/height fit so the whole spine is smaller (<1 shrinks both axes). */
+const EXPANDED_WILD_FIT_SCALE = 1.27;
+const EXPANDED_WILD_SHIFT_DOWN_FRAC = 0.16;
+/** Positive nudges the sprite to the left; lower / negative → further right. */
+const EXPANDED_WILD_SHIFT_LEFT_FRAC = -0.17;
 
-export function wildAnimationForRow(row: number): WildAnimationName {
+export function wildAnimationForRow(row: number): WildShowAnimationName {
   return row === 0 ? 'wild1' : row === 2 ? 'wild3' : 'wild2';
 }
 
@@ -56,7 +63,7 @@ export function createWinSpineForSymbol(
     case 9: {
       const r = row ?? 1;
       const anim = wildAnimationForRow(r);
-      return winSpineSmooth(createWildSpine({ loop: false, animation: anim, ticker }), anim);
+      return createWildSpineShowThenIdle(anim, ticker);
     }
     case 10:
       return winSpineSmooth(createScatterSpine({ loop: false, animation: 'win', ticker }), 'win');
@@ -97,8 +104,8 @@ export function layoutWildSpineExpandedInColumn(
   const bh = lb.height > 0 ? lb.height : 1;
   const paddedW = cellW * Math.max(0.55, 1 - 2 * EXPANDED_WILD_SIDE_PAD_FRAC);
   const targetW = paddedW;
-  const targetH = columnHeight * 0.98 * EXPANDED_WILD_HEIGHT_MUL;
-  const s = Math.max(targetW / bw, targetH / bh);
+  const targetH = columnHeight * EXPANDED_WILD_COLUMN_H_FRAC * EXPANDED_WILD_HEIGHT_MUL;
+  const s = Math.max(targetW / bw, targetH / bh) * EXPANDED_WILD_FIT_SCALE;
   spine.scale.set(s);
   const nx = absXCenter - (lb.x + lb.width / 2) * s - cellW * EXPANDED_WILD_SHIFT_LEFT_FRAC;
   let ny = absYCenter - (lb.y + lb.height / 2) * s;

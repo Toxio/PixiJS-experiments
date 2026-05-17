@@ -38,8 +38,10 @@ export function ensureWildSpineLoaded(): Promise<void> {
   return loadPromise;
 }
 
-/** No `win` clip — use `wild1`–`wild3` or `idle` / `idle1`–`idle3`. */
-export type WildAnimationName = 'idle' | 'idle1' | 'idle2' | 'idle3' | 'wild1' | 'wild2' | 'wild3';
+/** One-shot reveal clips before looping idle. */
+export type WildShowAnimationName = 'wild1' | 'wild2' | 'wild3';
+
+export type WildAnimationName = 'idle' | 'idle1' | 'idle2' | 'idle3' | WildShowAnimationName;
 
 export type CreateWildSpineOptions = {
   ticker?: Ticker;
@@ -47,13 +49,57 @@ export type CreateWildSpineOptions = {
   animation?: WildAnimationName;
 };
 
-export function createWildSpine(options?: CreateWildSpineOptions): Spine {
-  const spine = Spine.from({
+const DEFAULT_WILD_TO_IDLE_MIX_SEC = 0.2;
+
+export function idleAnimationForWildShow(show: WildShowAnimationName): 'idle1' | 'idle2' | 'idle3' {
+  switch (show) {
+    case 'wild1':
+      return 'idle1';
+    case 'wild2':
+      return 'idle2';
+    case 'wild3':
+    default:
+      return 'idle3';
+  }
+}
+
+function createWildSpineInstance(ticker?: Ticker): Spine {
+  return Spine.from({
     skeleton: WILD_SKEL_ALIAS,
     atlas: WILD_ATLAS_ALIAS,
     boundsProvider: new SetupPoseBoundsProvider(),
-    ticker: options?.ticker,
+    ticker,
   });
+}
+
+/**
+ * Play `wild1`–`wild3` once, then crossfade into the matching looping idle (`idle1`–`idle3`).
+ */
+export function applyWildShowThenIdleLoop(
+  spine: Spine,
+  showAnim: WildShowAnimationName,
+  mixSec = DEFAULT_WILD_TO_IDLE_MIX_SEC,
+): void {
+  const idleAnim = idleAnimationForWildShow(showAnim);
+  const state = spine.state;
+  state.data.setMix(showAnim, idleAnim, mixSec);
+  state.setAnimation(0, showAnim, false);
+  state.addAnimation(0, idleAnim, true, 0);
+  spine.update(0);
+}
+
+export function createWildSpineShowThenIdle(
+  showAnim: WildShowAnimationName,
+  ticker?: Ticker,
+  mixSec?: number,
+): Spine {
+  const spine = createWildSpineInstance(ticker);
+  applyWildShowThenIdleLoop(spine, showAnim, mixSec);
+  return spine;
+}
+
+export function createWildSpine(options?: CreateWildSpineOptions): Spine {
+  const spine = createWildSpineInstance(options?.ticker);
   const anim = options?.animation ?? 'wild1';
   spine.state.setAnimation(0, anim, options?.loop ?? true);
   spine.update(0);

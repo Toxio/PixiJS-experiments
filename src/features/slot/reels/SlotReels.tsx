@@ -31,8 +31,7 @@ import { ensureRoseSpineLoaded } from '../../../animation/roseSpine';
 import { ensureSevenSpineLoaded } from '../../../animation/sevenSpine';
 import { ensureScatterSpineLoaded } from '../../../animation/scatterSpine';
 import { ensureStarSpineLoaded } from '../../../animation/starSpine';
-import { applySmoothWinLoop } from '../../../animation/spineSmoothLoop';
-import { createWildSpine, ensureWildSpineLoaded } from '../../../animation/wildSpine';
+import { createWildSpineShowThenIdle, ensureWildSpineLoaded } from '../../../animation/wildSpine';
 import { getPaylineForLineId } from '../../../constant/paylines';
 import { ALL_ASSETS, ensureHeelsReelSymbolTexture, randomAlias, symbolAlias } from './assets';
 import { LINE_DELAY_MS, REEL_COUNT, REEL_SIZE, SPEED, SPIN_SPEED } from './constants';
@@ -246,12 +245,7 @@ export function SlotReels({
     for (let col = 0; col < matrix.length; col++) {
       if (!expandingWild[col]) continue;
       const anim = wildAnimationForRow(1);
-      const spine = createWildSpine({
-        loop: false,
-        animation: anim,
-        ticker: app.ticker,
-      });
-      applySmoothWinLoop(spine, anim);
+      const spine = createWildSpineShowThenIdle(anim, app.ticker);
       const cx = gridX + col * cellW + cellW / 2;
       const cy = gridY + gridH / 2;
       layoutWildSpineExpandedInColumn(spine, cx, cy, cellW, gridH);
