@@ -30,7 +30,6 @@ import { ensureParfumeSpineLoaded } from '../../../animation/parfumeSpine';
 import { ensureRoseSpineLoaded } from '../../../animation/roseSpine';
 import { ensureSevenSpineLoaded } from '../../../animation/sevenSpine';
 import { ensureScatterSpineLoaded } from '../../../animation/scatterSpine';
-import { applySmoothWinLoop } from '../../../animation/spineSmoothLoop';
 import { ensureStarSpineLoaded } from '../../../animation/starSpine';
 import { createSymbolFxSpine, ensureSymbolFxSpineLoaded } from '../../../animation/symbolFxSpine';
 import { createWildSpineShowThenIdle, ensureWildSpineLoaded } from '../../../animation/wildSpine';
@@ -437,7 +436,6 @@ export function SlotReels({
         if (!spine) continue;
 
         const fxSpine = createSymbolFxSpine({ loop: false, animation: 'win', ticker: app.ticker });
-        applySmoothWinLoop(fxSpine, 'win');
         layoutSymbolFxInCell(fxSpine, absX, absY, cellW, cellH);
         layoutSpineInCell(spine, absX, absY, cellW, cellH);
         overlay.addChild(fxSpine);
