@@ -295,13 +295,14 @@ export function SlotReels({
     reelCont.y = gridY;
     app.stage.addChild(reelCont);
 
-    const wildOverlayCont = new Container();
-    app.stage.addChild(wildOverlayCont);
-    wildOverlayRef.current = wildOverlayCont;
-
     const winOverlayCont = new Container();
     app.stage.addChild(winOverlayCont);
     winOverlayRef.current = winOverlayCont;
+
+    /** Above per-symbol win spines, below payline (line must stay on top). */
+    const wildOverlayCont = new Container();
+    app.stage.addChild(wildOverlayCont);
+    wildOverlayRef.current = wildOverlayCont;
 
     const paylineLayer = new Container();
     app.stage.addChild(paylineLayer);
