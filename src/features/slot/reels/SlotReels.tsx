@@ -50,6 +50,7 @@ import {
   layoutSymbolFxInCell,
   layoutWildSpineExpandedInColumn,
   wildAnimationForRow,
+  wildRevealRowForExpandingColumn,
 } from './spineWin';
 import { createSymbolSprite, setSlotSymbolVisibility, updateSymbol } from './symbolSprites';
 import type { Reel, ReelTween, SlotReelsProps, SlotSymbol, WinCell } from './types';
@@ -253,11 +254,12 @@ export function SlotReels({
 
     for (let col = 0; col < matrix.length; col++) {
       if (!expandingWild[col]) continue;
-      const anim = wildAnimationForRow(1);
+      const revealRow = wildRevealRowForExpandingColumn(matrix, col);
+      const anim = wildAnimationForRow(revealRow);
       const spine = createWildSpineShowThenIdle(anim, app.ticker);
       const cx = gridX + col * cellW + cellW / 2;
       const cy = gridY + gridH / 2;
-      layoutWildSpineExpandedInColumn(spine, cx, cy, cellW, gridH);
+      layoutWildSpineExpandedInColumn(spine, cx, cy, cellW, gridH, anim);
       overlay.addChild(spine);
       wildActiveSpinesRef.current.push(spine);
     }
