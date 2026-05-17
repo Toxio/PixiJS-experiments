@@ -1,5 +1,6 @@
-import { Assets, Rectangle, Texture } from 'pixi.js';
+import { Assets, Rectangle, Texture, type Renderer } from 'pixi.js';
 
+import { createScatterSpine, ensureScatterSpineLoaded } from '../../../animation/scatterSpine';
 import heelsAtlasPageUrl from '../../../assets/heels/heels.png';
 import glassImg from '../../../assets/symbols/images/glass.png';
 import gobletImg from '../../../assets/symbols/images/goblet.png';
@@ -7,7 +8,6 @@ import lipsImg from '../../../assets/symbols/images/lips.png';
 import lipstickImg from '../../../assets/symbols/images/lipstick.png';
 import parfumeImg from '../../../assets/symbols/images/parfume.png';
 import roseImg from '../../../assets/symbols/images/rose.png';
-import scatterImg from '../../../assets/scatter/scatter_box.png';
 import sevenImg from '../../../assets/symbols/images/seven.png';
 import starImg from '../../../assets/symbols/images/star.png';
 import wildImg from '../../../assets/wild/wild-icon.png';
@@ -38,7 +38,31 @@ export async function ensureHeelsReelSymbolTexture(): Promise<void> {
   prev?.destroy(false);
 }
 
-/** Resolves reel sprite textures; `heels` uses a cropped atlas region (see {@link ensureHeelsReelSymbolTexture}). */
+let scatterReelTexture: Texture | null = null;
+
+/**
+ * Rasterises the Spine scatter (setup pose) for reel sprites. The atlas page PNG is a
+ * texture sheet — using it directly as `sym-scatter` showed every region in a row.
+ */
+export async function ensureScatterReelSymbolTexture(renderer: Renderer): Promise<void> {
+  if (scatterReelTexture) return;
+  await ensureScatterSpineLoaded();
+  const spine = createScatterSpine({ loop: false, animation: 'win' });
+  spine.state.clearTracks();
+  spine.skeleton.setToSetupPose();
+  spine.update(0);
+
+  const prev = scatterReelTexture;
+  scatterReelTexture = renderer.textureGenerator.generateTexture({
+    target: spine,
+    clearColor: 0x00000000,
+    resolution: renderer.resolution,
+  });
+  spine.destroy({ children: true });
+  prev?.destroy(false);
+}
+
+/** Resolves reel sprites: `heels` cropped atlas; `sym-scatter` baked from Spine setup pose. */
 export function resolveSymbolTexture(alias: string): Texture {
   if (alias === 'heels') {
     if (!heelsReelTexture) {
@@ -47,6 +71,14 @@ export function resolveSymbolTexture(alias: string): Texture {
       );
     }
     return heelsReelTexture;
+  }
+  if (alias === 'sym-scatter') {
+    if (!scatterReelTexture) {
+      throw new Error(
+        'scatter reel texture missing — ensureScatterReelSymbolTexture must run before symbols',
+      );
+    }
+    return scatterReelTexture;
   }
   return Texture.from(alias);
 }
@@ -62,7 +94,6 @@ export const ALL_ASSETS = [
   { alias: 'sym-parfume', src: parfumeImg },
   { alias: 'sym-glass', src: glassImg },
   { alias: 'sym-wild', src: wildImg },
-  { alias: 'sym-scatter', src: scatterImg },
 ] as const;
 
 /**

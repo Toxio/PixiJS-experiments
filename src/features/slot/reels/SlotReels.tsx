@@ -33,7 +33,13 @@ import { ensureScatterSpineLoaded } from '../../../animation/scatterSpine';
 import { ensureStarSpineLoaded } from '../../../animation/starSpine';
 import { createWildSpineShowThenIdle, ensureWildSpineLoaded } from '../../../animation/wildSpine';
 import { getPaylineForLineId } from '../../../constant/paylines';
-import { ALL_ASSETS, ensureHeelsReelSymbolTexture, randomAlias, symbolAlias } from './assets';
+import {
+  ALL_ASSETS,
+  ensureHeelsReelSymbolTexture,
+  ensureScatterReelSymbolTexture,
+  randomAlias,
+  symbolAlias,
+} from './assets';
 import { LINE_DELAY_MS, REEL_COUNT, REEL_SIZE, SPEED, SPIN_SPEED } from './constants';
 import { backout, lerp } from './easing';
 import { getSlotGridMetrics } from './grid';
@@ -341,6 +347,7 @@ export function SlotReels({
 
     async function init() {
       await ensureHeelsReelSymbolTexture();
+      await ensureScatterReelSymbolTexture(app.renderer);
       await Assets.load(ALL_ASSETS);
       if (cancelled) return;
 
