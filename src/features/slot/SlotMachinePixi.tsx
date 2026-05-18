@@ -114,14 +114,14 @@ export function SlotMachinePixi() {
         />
 
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <button
-            className="smp-buy-bonus-btn"
-            type="button"
-            onClick={() => setBuyBonusOpen(true)}
-            disabled={spinning || status !== 'ready'}
-          >
-            Buy Bonus
-          </button>
+          {/*<button*/}
+          {/*  className="smp-buy-bonus-btn"*/}
+          {/*  type="button"*/}
+          {/*  onClick={() => setBuyBonusOpen(true)}*/}
+          {/*  disabled={spinning || status !== 'ready'}*/}
+          {/*>*/}
+          {/*  Buy Bonus*/}
+          {/*</button>*/}
 
           <button
             className={`smp-spin-btn${cannotAffordBet ? ' smp-spin-btn--insufficient' : ''}`}
