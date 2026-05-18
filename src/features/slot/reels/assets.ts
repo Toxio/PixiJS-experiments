@@ -52,14 +52,12 @@ export async function ensureScatterReelSymbolTexture(renderer: Renderer): Promis
   spine.skeleton.setToSetupPose();
   spine.update(0);
 
-  const prev = scatterReelTexture;
   scatterReelTexture = renderer.textureGenerator.generateTexture({
     target: spine,
     clearColor: 0x00000000,
     resolution: renderer.resolution,
   });
   spine.destroy({ children: true });
-  prev?.destroy(false);
 }
 
 /** Resolves reel sprites: `heels` cropped atlas; `sym-scatter` baked from Spine setup pose. */
