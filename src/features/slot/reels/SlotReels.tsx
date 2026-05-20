@@ -41,7 +41,7 @@ import {
   randomAlias,
   symbolAlias,
 } from './assets';
-import { LINE_DELAY_MS, REEL_COUNT, REEL_SIZE, SPEED, SPIN_SPEED } from './constants';
+import { LINE_DELAY_MS, REEL_COUNT, REEL_SIZE, SPEED, SPIN_SPEED, VISIBLE_ROWS } from './constants';
 import { backout, lerp } from './easing';
 import { getSlotGridMetrics } from './grid';
 import {
@@ -52,7 +52,12 @@ import {
   wildAnimationForRow,
   wildRevealRowForExpandingColumn,
 } from './spineWin';
-import { createSymbolSprite, setSlotSymbolVisibility, updateSymbol } from './symbolSprites';
+import {
+  createSymbolSprite,
+  setSlotSymbolDimmed,
+  setSlotSymbolVisibility,
+  updateSymbol,
+} from './symbolSprites';
 import type { Reel, ReelTween, SlotReelsProps, SlotSymbol, WinCell } from './types';
 
 export function SlotReels({
@@ -399,15 +404,35 @@ export function SlotReels({
 
     void init();
 
+    function resetGridSymbolAppearance() {
+      for (const reel of reelsRef.current) {
+        for (const sym of reel.symbols) {
+          setSlotSymbolVisibility(sym, true);
+          setSlotSymbolDimmed(sym, false);
+        }
+      }
+    }
+
+    function dimInactiveGridSymbols(activeCells: ReadonlySet<string>) {
+      for (let col = 0; col < REEL_COUNT; col++) {
+        if (expandingWildColsRef.current.includes(col)) continue;
+        const reel = reelsRef.current[col];
+        if (!reel) continue;
+        for (let row = 0; row < VISIBLE_ROWS; row++) {
+          const sym = reel.symbols[row + 1];
+          if (!sym) continue;
+          setSlotSymbolDimmed(sym, !activeCells.has(`${col},${row}`));
+        }
+      }
+    }
+
     function deactivateCurrentLine() {
       for (const spine of activeWinSpinesRef.current) {
         if (spine.parent) spine.parent.removeChild(spine);
         spine.destroy();
       }
       activeWinSpinesRef.current = [];
-      for (const reel of reelsRef.current) {
-        for (const sym of reel.symbols) setSlotSymbolVisibility(sym, true);
-      }
+      resetGridSymbolAppearance();
       hideWildStripColumnsRef.current?.(expandingWildColsRef.current);
       paylineLayerRef.current?.removeChildren();
     }
@@ -422,6 +447,11 @@ export function SlotReels({
 
       anims[idx].restart();
       layer.addChild(anims[idx].container);
+
+      const activeCells = new Set(
+        (winCellsByLineRef.current[idx] ?? []).map(({ col, row }) => `${col},${row}`),
+      );
+      dimInactiveGridSymbols(activeCells);
 
       if (!spineReadyRef.current) return;
 

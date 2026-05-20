@@ -25,8 +25,16 @@ export function updateSymbol(sym: SlotSymbol, alias: string, cw: number, ch: num
   fitSprite(sym.sprite, cw, ch);
 }
 
+export const INACTIVE_SYMBOL_ALPHA = 0.35;
+
+export function setSlotSymbolDimmed(sym: SlotSymbol | undefined, dimmed: boolean): void {
+  if (!sym) return;
+  sym.sprite.alpha = dimmed ? INACTIVE_SYMBOL_ALPHA : 1;
+}
+
 export function setSlotSymbolVisibility(sym: SlotSymbol | undefined, visible: boolean): void {
   if (!sym) return;
   sym.sprite.visible = visible;
   sym.container.visible = visible;
+  if (visible) sym.sprite.alpha = 1;
 }
