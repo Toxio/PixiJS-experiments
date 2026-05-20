@@ -2,6 +2,7 @@ import { Application } from '@pixi/react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { useSlotsHubSignalR } from '../../hooks/useSlotsHubSignalR';
+import { getCurrencySymbol } from '../../utils/currency';
 import { canAffordStake, spendableBalanceForStake } from './stakeBalance';
 import { exitToLobby, getExitLobbyHref } from '../../utils/getExitLobbyUrl';
 import { BalanceRow } from './BalanceRow';
@@ -75,7 +76,11 @@ export function SlotMachinePixi() {
   return (
     <div className="smp-wrapper">
       <div className="smp-top-bar">
-        <BalanceRow balance={balance} currency={currency} winAmount={winAmount} />
+        <BalanceRow
+          balance={balance}
+          currencySymbol={getCurrencySymbol(currency)}
+          winAmount={winAmount}
+        />
         <button
           type="button"
           className="smp-lobby-btn"

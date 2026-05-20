@@ -1,4 +1,4 @@
-import type { HubConnection } from "@microsoft/signalr";
+import type { HubConnection } from '@microsoft/signalr';
 import {
   type Dispatch,
   type SetStateAction,
@@ -6,17 +6,12 @@ import {
   useEffect,
   useRef,
   useState,
-} from "react";
-import {
-  createSlotsHubConnection,
-  DEFAULT_SLOTS_INITIAL_STATE,
-} from "../api/slotsHubConnection";
-import {
-  canAffordStake,
-  spendableBalanceForStake,
-} from "../features/slot/stakeBalance";
+} from 'react';
+import { createSlotsHubConnection, DEFAULT_SLOTS_INITIAL_STATE } from '../api/slotsHubConnection';
+import { canAffordStake, spendableBalanceForStake } from '../features/slot/stakeBalance';
+import { resolveCurrencyCode } from '../utils/currency';
 
-export type ConnStatus = "connecting" | "ready" | "error";
+export type ConnStatus = 'connecting' | 'ready' | 'error';
 
 /**
  * One line win from the server. `symbol` is the paytable / combo symbol used to
@@ -82,21 +77,13 @@ function defaultMatrix(): number[][] {
 }
 
 function isNumberMatrix(m: unknown): m is number[][] {
-  return (
-    Array.isArray(m) &&
-    m.length > 0 &&
-    m.every((row) => Array.isArray(row) && row.length > 0)
-  );
+  return Array.isArray(m) && m.length > 0 && m.every((row) => Array.isArray(row) && row.length > 0);
 }
 
 /** Server sends `[reel][row]` (5×3). If we get 3×5 (rows × reels), transpose. */
 function normalizeSpinMatrix(raw: number[][]): number[][] {
   let cols = raw;
-  if (
-    cols.length === VISIBLE_ROWS &&
-    cols[0] &&
-    cols[0].length === REEL_COUNT
-  ) {
+  if (cols.length === VISIBLE_ROWS && cols[0] && cols[0].length === REEL_COUNT) {
     cols = Array.from({ length: REEL_COUNT }, (_, c) => [
       Number(cols[0][c]) || 0,
       Number(cols[1][c]) || 0,
@@ -111,9 +98,7 @@ function normalizeSpinMatrix(raw: number[][]): number[][] {
   return out;
 }
 
-function matrixFromRecord(
-  obj: Record<string, unknown> | undefined,
-): number[][] | undefined {
+function matrixFromRecord(obj: Record<string, unknown> | undefined): number[][] | undefined {
   if (!obj) return undefined;
   const raw = (obj.Matrix ?? obj.matrix) as unknown;
   if (!isNumberMatrix(raw)) return undefined;
@@ -121,22 +106,12 @@ function matrixFromRecord(
 }
 
 /** Spin payload: `result.result.matrix` or `result.matrix` (see GameActionResult). */
-function extractSpinMatrixFromGameAction(
-  data: Record<string, unknown>,
-): number[][] | undefined {
-  const payload = (data.Result ?? data.result) as
-    | Record<string, unknown>
-    | undefined;
+function extractSpinMatrixFromGameAction(data: Record<string, unknown>): number[][] | undefined {
+  const payload = (data.Result ?? data.result) as Record<string, unknown> | undefined;
   const inner = payload
-    ? ((payload.Result ?? payload.result) as
-        | Record<string, unknown>
-        | undefined)
+    ? ((payload.Result ?? payload.result) as Record<string, unknown> | undefined)
     : undefined;
-  return (
-    matrixFromRecord(inner) ??
-    matrixFromRecord(payload) ??
-    matrixFromRecord(data)
-  );
+  return matrixFromRecord(inner) ?? matrixFromRecord(payload) ?? matrixFromRecord(data);
 }
 
 export function useSlotsHubSignalR({
@@ -147,9 +122,9 @@ export function useSlotsHubSignalR({
   /** Latest grid result for the in-flight spin — read in handleSpinComplete without nested setState. */
   const targetMatrixRef = useRef<number[][] | null>(null);
 
-  const [status, setStatus] = useState<ConnStatus>("connecting");
+  const [status, setStatus] = useState<ConnStatus>('connecting');
   const [balance, setBalance] = useState(0);
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState(() => resolveCurrencyCode());
   const [matrix, setMatrix] = useState<number[][]>(defaultMatrix());
   const [quickBets, setQuickBets] = useState<number[]>([1, 2, 5, 10]);
   const [betAmount, setBetAmountState] = useState(2);
@@ -172,27 +147,25 @@ export function useSlotsHubSignalR({
     let disposed = false;
     const connection = createSlotsHubConnection();
 
-    connection.on("InitialStateResult", (data: Record<string, unknown>) => {
+    connection.on('InitialStateResult', (data: Record<string, unknown>) => {
       if (disposed) return;
-      console.log("InitialStateResult", data);
+      console.log('InitialStateResult', data);
       const bal = Number(data.Balance ?? data.balance ?? 0);
       setBalance(bal);
-      setCurrency(String(data.CurrencyCode ?? data.currencyCode ?? "USD"));
+      setCurrency(resolveCurrencyCode(String(data.CurrencyCode ?? data.currencyCode ?? 'USD')));
       const matRaw = (data.Matrix ?? data.matrix) as unknown;
       if (isNumberMatrix(matRaw)) setMatrix(normalizeSpinMatrix(matRaw));
       const qb = (data.QuickBets ?? data.quickBets) as number[] | undefined;
       if (qb?.length) setQuickBets(qb);
       const dba = Number(data.DefaultBetAmount ?? data.defaultBetAmount ?? 0);
       if (dba) setBetAmountState(dba);
-      setStatus("ready");
+      setStatus('ready');
     });
 
-    connection.on("GameActionResult", (data: Record<string, unknown>) => {
+    connection.on('GameActionResult', (data: Record<string, unknown>) => {
       if (disposed) return;
-      console.log("GameActionResult", data);
-      const payload = (data.Result ?? data.result) as
-        | Record<string, unknown>
-        | undefined;
+      console.log('GameActionResult', data);
+      const payload = (data.Result ?? data.result) as Record<string, unknown> | undefined;
       const spinResult = (payload?.Result ?? payload?.result) as
         | Record<string, unknown>
         | undefined;
@@ -204,26 +177,12 @@ export function useSlotsHubSignalR({
         | Array<Record<string, unknown>>
         | undefined;
 
-      setBalance(
-        Number(
-          payload?.Balance ??
-            payload?.balance ??
-            data.Balance ??
-            data.balance ??
-            0,
-        ),
-      );
+      setBalance(Number(payload?.Balance ?? payload?.balance ?? data.Balance ?? data.balance ?? 0));
       const rawWin = Number(
-        payload?.WinAmount ??
-          payload?.winAmount ??
-          data.WinAmount ??
-          data.winAmount ??
-          0,
+        payload?.WinAmount ?? payload?.winAmount ?? data.WinAmount ?? data.winAmount ?? 0,
       );
       setWinAmount(Number.isFinite(rawWin) ? rawWin : 0);
-      const rawOdd = Number(
-        payload?.Odd ?? payload?.odd ?? data.Odd ?? data.odd ?? Number.NaN,
-      );
+      const rawOdd = Number(payload?.Odd ?? payload?.odd ?? data.Odd ?? data.odd ?? Number.NaN);
       setSpinOdd(Number.isFinite(rawOdd) ? rawOdd : null);
       setWinLines(
         (rawWins ?? []).map((w) => ({
@@ -237,9 +196,7 @@ export function useSlotsHubSignalR({
         | number[]
         | undefined;
       setExpandingWild(
-        Array.isArray(rawEW) && rawEW.length === REEL_COUNT
-          ? rawEW.map(Number)
-          : [0, 0, 0, 0, 0],
+        Array.isArray(rawEW) && rawEW.length === REEL_COUNT ? rawEW.map(Number) : [0, 0, 0, 0, 0],
       );
       if (mat?.length) setTargetMatrix(mat);
     });
@@ -250,11 +207,11 @@ export function useSlotsHubSignalR({
       .start()
       .then(async () => {
         if (disposed) return;
-        await connection.invoke("InitialState", DEFAULT_SLOTS_INITIAL_STATE);
+        await connection.invoke('InitialState', DEFAULT_SLOTS_INITIAL_STATE);
       })
       .catch(() => {
         if (disposed) return;
-        setStatus("error");
+        setStatus('error');
       });
 
     return () => {
@@ -279,7 +236,7 @@ export function useSlotsHubSignalR({
   }, [spinning, safetyMs]);
 
   const spin = useCallback(async () => {
-    if (!connRef.current || spinning || status !== "ready") return;
+    if (!connRef.current || spinning || status !== 'ready') return;
     const stakePool = spendableBalanceForStake(balance, winAmount);
     if (!canAffordStake(betAmount, stakePool)) {
       onInsufficientFunds?.();
@@ -292,8 +249,8 @@ export function useSlotsHubSignalR({
     setSpinOdd(null);
     setTargetMatrix(null);
     try {
-      await connRef.current.invoke("GameAction", {
-        ActionType: "Spin",
+      await connRef.current.invoke('GameAction', {
+        ActionType: 'Spin',
         Model: { Amount: betAmount },
       });
     } catch {
@@ -320,11 +277,7 @@ export function useSlotsHubSignalR({
         setWinLines(preset.winLines);
         setWinAmount(preset.winAmount);
         setExpandingWild(preset.expandingWild ?? [0, 0, 0, 0, 0]);
-        setSpinOdd(
-          preset.odd !== undefined && Number.isFinite(preset.odd)
-            ? preset.odd
-            : null,
-        );
+        setSpinOdd(preset.odd !== undefined && Number.isFinite(preset.odd) ? preset.odd : null);
       }, 0);
     },
     [spinning, betAmount, balance, winAmount, onInsufficientFunds],

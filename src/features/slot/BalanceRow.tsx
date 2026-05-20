@@ -1,16 +1,16 @@
 interface BalanceRowProps {
   balance: number;
-  currency: string;
+  currencySymbol: string;
   winAmount: number | null;
 }
 
-export function BalanceRow({ balance, currency, winAmount }: BalanceRowProps) {
+export function BalanceRow({ balance, currencySymbol, winAmount }: BalanceRowProps) {
   return (
     <div className="smp-hud">
       <div className="smp-hud-tile">
         <span className="smp-hud-label">Balance</span>
         <span className="smp-hud-value">
-          {currency} {balance.toFixed(2)}
+          {currencySymbol} {balance.toFixed(2)}
         </span>
       </div>
 
